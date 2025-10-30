@@ -1,0 +1,16 @@
+out
+dist
+node_modules
+.vscode-test/
+*.vsix
+*.map
+
+# Ignore compiled JS (but keep test files and config)
+*.js
+!tests/**/*.js
+!tests/**/*.c
+!esbuild.js
+!eslint.config.mjs
+
+# Ignore C files in src (if any) but keep test files
+src/**/*.c

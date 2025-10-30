@@ -1,0 +1,203 @@
+{
+  "name": "c-cpp-macrolens",
+  "displayName": "C/C++ MacroLens",
+  "description": "Recursive macro analysis and expansion for C/C++",
+  "version": "0.0.1",
+  "publisher": "ytlee",
+  "icon": "media/icon.png",
+  "license": "MIT",
+  "author": {
+    "name": "ytlee",
+    "url": "https://github.com/Lee20171010"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lee20171010/c-cpp-macrolens"
+  },
+  "bugs": {
+    "url": "https://github.com/Lee20171010/c-cpp-macrolens/issues"
+  },
+  "homepage": "https://github.com/Lee20171010/c-cpp-macrolens#readme",
+  "engines": {
+    "vscode": "^1.104.0",
+    "node": ">=18.0.0"
+  },
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Visualization"
+  ],
+  "keywords": [
+    "C",
+    "C++",
+    "macro",
+    "preprocessor",
+    "hover",
+    "lint",
+    "treeview",
+    "expansion"
+  ],
+  "activationEvents": [
+    "onLanguage:c",
+    "onLanguage:cpp"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "c",
+        "extensions": [
+          ".c",
+          ".h"
+        ],
+        "aliases": [
+          "C"
+        ]
+      },
+      {
+        "id": "cpp",
+        "extensions": [
+          ".cpp",
+          ".hpp",
+          ".cc",
+          ".hh"
+        ],
+        "aliases": [
+          "C++"
+        ]
+      }
+    ],
+    "configuration": {
+      "title": "C/C++ MacroLens",
+      "properties": {
+        "macrolens.stripExtraParentheses": {
+          "type": "boolean",
+          "default": true,
+          "description": "Remove redundant parentheses in final display"
+        },
+        "macrolens.enableTreeView": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable macro expansion tree view"
+        },
+        "macrolens.enableHoverProvider": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable hover information for macros"
+        },
+        "macrolens.enableDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable diagnostics for undefined macros and errors"
+        },
+        "macrolens.expansionMode": {
+          "type": "string",
+          "enum": [
+            "single-macro",
+            "single-layer"
+          ],
+          "default": "single-layer",
+          "description": "Expansion mode: 'single-macro' expands one macro at a time, 'single-layer' expands all macros at the same nesting level simultaneously"
+        },
+        "macrolens.debounceDelay": {
+          "type": "number",
+          "default": 500,
+          "minimum": 100,
+          "maximum": 2000,
+          "description": "Debounce delay in milliseconds for file change detection (100-2000ms). Higher values reduce CPU usage."
+        },
+        "macrolens.maxUpdateDelay": {
+          "type": "number",
+          "default": 8000,
+          "minimum": 2000,
+          "maximum": 30000,
+          "description": "Maximum delay before forced update in milliseconds (2-30 seconds). Prevents indefinite postponement during continuous editing. Works together with Debounce Delay."
+        },
+        "macrolens.detectTypeDeclarations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Detect and track type declarations (typedef, struct, enum, union) with uppercase names to prevent false 'undefined macro' warnings. Disable if your project uses different naming conventions."
+        },
+        "macrolens.maxExpansionDepth": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "maximum": 100,
+          "description": "Maximum depth for recursive macro expansion (5-100). Higher values allow deeper macro nesting but may impact performance. Default: 30"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "macrolens.pickRedefinition",
+        "title": "MacroLens: Choose Macro Redefinition"
+      },
+      {
+        "command": "macrolens.rescan",
+        "title": "MacroLens: Rescan Project"
+      },
+      {
+        "command": "macrolens.flushScans",
+        "title": "MacroLens: Flush Pending Scans"
+      },
+      {
+        "command": "macrolens.showStatistics",
+        "title": "MacroLens: Show Performance Statistics"
+      }
+    ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "macrolensContainer",
+          "title": "MacroLens",
+          "icon": ""
+        }
+      ]
+    },
+    "views": {
+      "macrolensContainer": [
+        {
+          "id": "macrolensTree",
+          "name": "MacroLens Tree",
+          "when": "macrolens.treeViewVisible"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run vscode:prepublish && vsce package",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/vscode": "^1.104.0",
+    "@typescript-eslint/eslint-plugin": "^8.42.0",
+    "@typescript-eslint/parser": "^8.42.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "electron-rebuild": "^3.2.9",
+    "esbuild": "^0.25.9",
+    "eslint": "^9.34.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.2"
+  },
+  "vsce": {
+    "dependencies": true,
+    "yarn": false
+  }
+}
