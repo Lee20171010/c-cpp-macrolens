@@ -91,8 +91,8 @@ export const REGEX_PATTERNS = {
     /** Matches #define directive */
     DEFINE_DIRECTIVE: /^\s*#\s*define\s+([A-Za-z_]\w*)(.*)$/,
     
-    /** Matches function-like #define directive (with parentheses immediately after name) */
-    DEFINE_FUNCTION_LIKE: /^\s*#\s*define\s+([A-Za-z_]\w*)\s*\(/,
+    /** Matches function-like #define directive (with parentheses immediately after name, NO space) */
+    DEFINE_FUNCTION_LIKE: /^\s*#\s*define\s+([A-Za-z_]\w*)\(/,
     
     /** Matches typedef declaration */
     TYPEDEF_DIRECTIVE: /^\s*typedef\s+/,

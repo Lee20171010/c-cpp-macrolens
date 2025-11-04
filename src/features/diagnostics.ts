@@ -492,6 +492,8 @@ export class MacroDiagnostics {
     /**
      * Build a mapping from original text positions to cleaned text positions
      * Positions inside comments will not have a mapping
+     * 
+     * Note: originalText may have lowercased parameters from lowercaseDefineParameters
      */
     private buildPositionMap(originalText: string, cleanText: string): Map<number, number> {
         const map = new Map<number, number>();
@@ -499,8 +501,12 @@ export class MacroDiagnostics {
         let cleanedIndex = 0;
         
         while (originalIndex < originalText.length && cleanedIndex < cleanText.length) {
-            if (originalText[originalIndex] === cleanText[cleanedIndex]) {
-                // Characters match - record the position mapping
+            const origChar = originalText[originalIndex];
+            const cleanChar = cleanText[cleanedIndex];
+            
+            if (origChar === cleanChar || origChar.toLowerCase() === cleanChar.toLowerCase()) {
+                // Characters match (exact or case-insensitive) - record the position mapping
+                // This handles both normal characters and lowercased parameters
                 map.set(originalIndex, cleanedIndex);
                 originalIndex++;
                 cleanedIndex++;
