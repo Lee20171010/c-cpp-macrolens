@@ -4,12 +4,9 @@
  */
 
 /**
- * Diagnostics constants
+ * Macro suggestion constants (used in hover provider)
  */
-export const DIAGNOSTICS_CONSTANTS = {
-    /** Maximum file size (in bytes) before skipping diagnostics */
-    MAX_FILE_SIZE: 500000, // 500KB
-    
+export const SUGGESTION_CONSTANTS = {
     /** Maximum Levenshtein distance for macro name suggestions */
     MAX_SUGGESTION_DISTANCE: 2,
     
@@ -19,7 +16,7 @@ export const DIAGNOSTICS_CONSTANTS = {
     /** Maximum number of macro suggestions to show */
     MAX_SUGGESTIONS: 3,
     
-    /** Maximum cache size before clearing */
+    /** Maximum cache size before clearing (for Levenshtein distance cache) */
     MAX_CACHE_SIZE: 1000,
 } as const;
 

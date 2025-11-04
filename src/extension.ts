@@ -13,6 +13,7 @@ let diagnostics: MacroDiagnostics;
 let macroDb: MacroDatabase;
 let expander: MacroExpander;
 let config: Configuration;
+let hoverProvider: MacroHoverProvider | null = null;
 let hoverProviderDisposables: vscode.Disposable[] = [];
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -145,7 +146,7 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
 
     // Register hover providers if enabled
     if (config.getConfig().enableHoverProvider) {
-        const hoverProvider = new MacroHoverProvider();
+        hoverProvider = new MacroHoverProvider();
         const cHoverDisposable = vscode.languages.registerHoverProvider(
             { scheme: 'file', language: 'c' },
             hoverProvider
@@ -323,7 +324,6 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
         // Show statistics command
         vscode.commands.registerCommand('macrolens.showStatistics', async () => {
             const stats = macroDb.getStatistics();
-            const diagMemory = diagnostics.getMemoryUsage();
             
             // Helper to format bytes to human readable
             const formatBytes = (bytes: number): string => {
@@ -336,6 +336,20 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
                 return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
             };
             
+            const memoryLines = [
+                '### Memory Usage',
+                `**Definitions Map**: ${stats.memoryUsage.definitionsMapSize} unique macros, ${stats.memoryUsage.totalDefinitions} total definitions (${formatBytes(stats.memoryUsage.definitionsMapBytes)})`,
+            ];
+            
+            // Add hover provider cache statistics if enabled
+            if (hoverProvider) {
+                const hoverMemory = hoverProvider.getMemoryUsage();
+                memoryLines.push(
+                    `**Distance Cache**: ${hoverMemory.distanceCacheSize} entries (${formatBytes(hoverMemory.distanceCacheBytes)})`,
+                    `**Macro Names Cache**: ${formatBytes(hoverMemory.allMacrosCacheBytes)}`
+                );
+            }
+            
             const message = [
                 '## MacroLens Performance Statistics',
                 '',
@@ -346,10 +360,7 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
                 `**Macros Found**: ${stats.macrosFound}`,
                 `**Average Scan Time**: ${stats.averageScanTime.toFixed(2)}ms`,
                 '',
-                '### Memory Usage',
-                `**Definitions Map**: ${stats.memoryUsage.definitionsMapSize} unique macros, ${stats.memoryUsage.totalDefinitions} total definitions (${formatBytes(stats.memoryUsage.definitionsMapBytes)})`,
-                `**Distance Cache**: ${diagMemory.distanceCacheSize} entries (${formatBytes(diagMemory.distanceCacheBytes)})`,
-                `**Macro Names Cache**: ${formatBytes(diagMemory.allMacrosCacheBytes)}`,
+                ...memoryLines,
                 '',
                 '### Debounce Settings',
                 `**Response Delay**: ${stats.debounceSettings.delay}ms`,
@@ -387,7 +398,7 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
                 
                 if (enabled) {
                     // Register hover providers
-                    const hoverProvider = new MacroHoverProvider();
+                    hoverProvider = new MacroHoverProvider();
                     const cHoverDisposable = vscode.languages.registerHoverProvider(
                         { scheme: 'file', language: 'c' },
                         hoverProvider
@@ -403,6 +414,10 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
                     // Dispose all hover providers
                     hoverProviderDisposables.forEach(disposable => disposable.dispose());
                     hoverProviderDisposables = [];
+                    if (hoverProvider) {
+                        hoverProvider.dispose();
+                        hoverProvider = null;
+                    }
                     vscode.window.showInformationMessage('MacroLens: Hover provider disabled');
                 }
             }
@@ -445,6 +460,9 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
 
 export function deactivate() {
     try {
+        if (hoverProvider) {
+            hoverProvider.dispose();
+        }
         if (diagnostics) {
             diagnostics.dispose();
         }

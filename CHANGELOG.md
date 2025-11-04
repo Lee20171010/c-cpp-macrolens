@@ -5,6 +5,23 @@ All notable changes to the "C/C++ MacroLens" extension will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🚀 Performance
+
+- **Lazy Evaluation for Suggestions**: Moved Levenshtein distance calculations from diagnostics phase to hover phase
+  - Diagnostics now show simplified messages without suggestions (e.g., "Undefined macro 'FOO'")
+  - Suggestions computed on-demand when user hovers over undefined macros (e.g., "Did you mean: `FOO`, `FOOBAR`?")
+  - Significantly reduces CPU usage during file editing and saving
+  - Removed file size limit in diagnostics - now handles files of any size
+
+### 🐛 Bug Fixes
+
+- **Position Mapping in Diagnostics**: Fixed incorrect diagnostic positions after macro parameter lowercasing
+  - Fixed `DEFINE_FUNCTION_LIKE` regex from `/\s*\(/` to `/\(/` to prevent false positives on object-like macros
+  - Enhanced `buildPositionMap` to use case-insensitive matching for accurate position tracking
+  - Diagnostics now correctly highlight the actual macro usage locations in source code
+
 ## [0.1.0] - 2025-10-31
 
 ### 🎉 Initial Release

@@ -3,17 +3,12 @@ import { MacroDatabase } from '../core/macroDb';
 import { MacroParser } from '../core/macroParser';
 import { MacroUtils } from '../utils/macroUtils';
 import { MacroExpander } from '../core/macroExpander';
-import { DIAGNOSTICS_CONSTANTS, REGEX_PATTERNS, BUILTIN_IDENTIFIERS } from '../utils/constants';
+import { REGEX_PATTERNS, BUILTIN_IDENTIFIERS } from '../utils/constants';
 
 export class MacroDiagnostics {
     private diagnosticCollection: vscode.DiagnosticCollection;
     private db: MacroDatabase;
     private expander: MacroExpander;
-    // Cache for Levenshtein distance calculations
-    private distanceCache: Map<string, number> = new Map();
-    // Cache for all macro names to avoid repeated getAllDefinitions() calls
-    private allMacrosCache: string[] | null = null;
-    private allMacrosCacheVersion: number = 0;
     // Debounce timer to avoid frequent diagnostics
     private debounceTimer: NodeJS.Timeout | null = null;
     private readonly DEBOUNCE_DELAY = 500; // 500ms debounce
@@ -40,12 +35,7 @@ export class MacroDiagnostics {
             return;
         }
 
-        // Skip very large files to prevent performance issues
         let text = document.getText();
-        if (text.length > DIAGNOSTICS_CONSTANTS.MAX_FILE_SIZE) {
-            console.log(`MacroLens: Skipping diagnostics for large file (${text.length} bytes): ${document.fileName}`);
-            return;
-        }
 
         // Lowercase function-like macro parameters in #define to avoid false undefined warnings
         // Example: #define FOO(BAR) (BAR + 1) -> #define FOO(bar) (bar + 1)
@@ -57,9 +47,6 @@ export class MacroDiagnostics {
         // This avoids false positives from comments and preprocessor directive arguments
         let cleanText = MacroParser.removeComments(text);
         cleanText = MacroParser.removePreprocessorDirectives(cleanText);
-
-        // Refresh macro cache if needed
-        this.refreshMacroCache();
 
         const diagnostics: vscode.Diagnostic[] = [];
 
@@ -125,14 +112,10 @@ export class MacroDiagnostics {
                         pos.translate(0, macroName.length)
                     );
 
-                    // Use cached macro names for similarity suggestions
-                    const suggestions = this.findSimilarMacros(macroName, this.allMacrosCache!);
-                    
+                    // Simplified diagnostic - suggestions will be shown in hover
                     const diagnostic = new vscode.Diagnostic(
                         range,
-                        suggestions.length > 0
-                            ? `Undefined macro '${macroName}'. Did you mean: ${suggestions.join(', ')}?`
-                            : `Undefined macro '${macroName}'`,
+                        `Undefined macro '${macroName}'`,
                         vscode.DiagnosticSeverity.Warning
                     );
                     diagnostic.source = 'MacroLens';
@@ -168,20 +151,12 @@ export class MacroDiagnostics {
                         pos.translate(0, macroName.length)
                     );
 
-                    // Build detailed message with suggestions for each undefined macro
-                    const undefinedWithSuggestions: string[] = [];
-                    for (const undefinedMacro of expansionResult.undefinedMacros) {
-                        const suggestions = this.findSimilarMacros(undefinedMacro, this.allMacrosCache!);
-                        if (suggestions.length > 0) {
-                            undefinedWithSuggestions.push(`${undefinedMacro} (did you mean: ${suggestions.join(', ')}?)`);
-                        } else {
-                            undefinedWithSuggestions.push(undefinedMacro);
-                        }
-                    }
+                    // Simplified diagnostic - suggestions will be shown in hover
+                    const undefinedList = Array.from(expansionResult.undefinedMacros).join(', ');
 
                     const diagnostic = new vscode.Diagnostic(
                         range,
-                        `Macro '${macroName}' expands to undefined macro${expansionResult.undefinedMacros.size > 1 ? 's' : ''}: ${undefinedWithSuggestions.join('; ')}`,
+                        `Macro '${macroName}' expands to undefined macro${expansionResult.undefinedMacros.size > 1 ? 's' : ''}: ${undefinedList}`,
                         vscode.DiagnosticSeverity.Warning
                     );
                     diagnostic.source = 'MacroLens';
@@ -234,14 +209,10 @@ export class MacroDiagnostics {
                         pos.translate(0, macroName.length)
                     );
 
-                    // Use cached macro names for similarity suggestions
-                    const suggestions = this.findSimilarMacros(macroName, this.allMacrosCache!);
-                    
+                    // Simplified diagnostic - suggestions will be shown in hover
                     const diagnostic = new vscode.Diagnostic(
                         range,
-                        suggestions.length > 0
-                            ? `Undefined macro '${macroName}'. Did you mean: ${suggestions.join(', ')}?`
-                            : `Undefined macro '${macroName}'`,
+                        `Undefined macro '${macroName}'`,
                         vscode.DiagnosticSeverity.Warning
                     );
                     diagnostic.source = 'MacroLens';
@@ -274,20 +245,12 @@ export class MacroDiagnostics {
                         pos.translate(0, macroName.length)
                     );
 
-                    // Build detailed message with suggestions for each undefined macro
-                    const undefinedWithSuggestions: string[] = [];
-                    for (const undefinedMacro of expansionResult.undefinedMacros) {
-                        const suggestions = this.findSimilarMacros(undefinedMacro, this.allMacrosCache!);
-                        if (suggestions.length > 0) {
-                            undefinedWithSuggestions.push(`${undefinedMacro} (did you mean: ${suggestions.join(', ')}?)`);
-                        } else {
-                            undefinedWithSuggestions.push(undefinedMacro);
-                        }
-                    }
+                    // Simplified diagnostic - suggestions will be shown in hover
+                    const undefinedList = Array.from(expansionResult.undefinedMacros).join(', ');
 
                     const diagnostic = new vscode.Diagnostic(
                         range,
-                        `Macro '${macroName}' expands to undefined macro${expansionResult.undefinedMacros.size > 1 ? 's' : ''}: ${undefinedWithSuggestions.join('; ')}`,
+                        `Macro '${macroName}' expands to undefined macro${expansionResult.undefinedMacros.size > 1 ? 's' : ''}: ${undefinedList}`,
                         vscode.DiagnosticSeverity.Warning
                     );
                     diagnostic.source = 'MacroLens';
@@ -632,158 +595,6 @@ export class MacroDiagnostics {
     }
 
     /**
-     * Refresh macro cache if database has changed
-     */
-    private refreshMacroCache(): void {
-        const currentVersion = this.getCurrentDbVersion();
-        if (!this.allMacrosCache || this.allMacrosCacheVersion !== currentVersion) {
-            this.allMacrosCache = Array.from(this.db.getAllDefinitions().keys());
-            this.allMacrosCacheVersion = currentVersion;
-        }
-    }
-
-    /**
-     * Get database version based on macro count
-     */
-    private getCurrentDbVersion(): number {
-        return this.db.getAllDefinitions().size;
-    }
-
-    private findSimilarMacros(name: string, candidates: string[]): string[] {
-        // Early exit if no candidates
-        if (candidates.length === 0) {
-            return [];
-        }
-
-        // Performance optimization: Limit candidates to avoid excessive processing
-        // For very large macro databases (>10,000 macros), only check relevant subset
-        const MAX_CANDIDATES = 10000;
-        const limitedCandidates = candidates.length > MAX_CANDIDATES 
-            ? this.selectRelevantCandidates(name, candidates, MAX_CANDIDATES)
-            : candidates;
-
-        // Clear cache periodically to prevent memory bloat
-        if (this.distanceCache.size > DIAGNOSTICS_CONSTANTS.MAX_CACHE_SIZE) {
-            this.distanceCache.clear();
-        }
-
-        const results: Array<{candidate: string, distance: number}> = [];
-        
-        for (const candidate of limitedCandidates) {
-            // Skip exact matches
-            if (candidate === name) {
-                continue;
-            }
-
-            // Quick length check - if lengths differ by more than MAX_SUGGESTION_DISTANCE, skip
-            const lengthDiff = Math.abs(name.length - candidate.length);
-            if (lengthDiff > DIAGNOSTICS_CONSTANTS.MAX_SUGGESTION_DISTANCE && 
-                name.length <= DIAGNOSTICS_CONSTANTS.MIN_SUBSTRING_LENGTH && 
-                candidate.length <= DIAGNOSTICS_CONSTANTS.MIN_SUBSTRING_LENGTH) {
-                continue;
-            }
-
-            // Check substring match first (faster than Levenshtein)
-            if (name.length > DIAGNOSTICS_CONSTANTS.MIN_SUBSTRING_LENGTH && candidate.includes(name)) {
-                results.push({ candidate, distance: 0 });
-                continue;
-            }
-            if (candidate.length > DIAGNOSTICS_CONSTANTS.MIN_SUBSTRING_LENGTH && name.includes(candidate)) {
-                results.push({ candidate, distance: 0 });
-                continue;
-            }
-
-            // Calculate Levenshtein distance with caching
-            const cacheKey = `${name}:${candidate}`;
-            let distance = this.distanceCache.get(cacheKey);
-            
-            if (distance === undefined) {
-                distance = this.levenshteinDistance(name, candidate);
-                this.distanceCache.set(cacheKey, distance);
-            }
-
-            if (distance <= DIAGNOSTICS_CONSTANTS.MAX_SUGGESTION_DISTANCE) {
-                results.push({ candidate, distance });
-            }
-        }
-
-        // Sort by distance and return top N suggestions
-        return results
-            .sort((a, b) => a.distance - b.distance)
-            .slice(0, DIAGNOSTICS_CONSTANTS.MAX_SUGGESTIONS)
-            .map(r => r.candidate);
-    }
-
-    /**
-     * Select relevant candidates from large candidate set for performance
-     * Uses heuristics to reduce search space while maintaining accuracy
-     */
-    private selectRelevantCandidates(name: string, candidates: string[], maxCount: number): string[] {
-        // Strategy 1: Prioritize candidates with same first character
-        const firstChar = name[0].toUpperCase();
-        const sameFirstChar = candidates.filter(c => c[0] === firstChar);
-        
-        if (sameFirstChar.length > 0 && sameFirstChar.length <= maxCount) {
-            return sameFirstChar;
-        }
-        
-        // Strategy 2: Filter by length similarity (±3 characters)
-        const targetLen = name.length;
-        const similarLength = candidates.filter(c => Math.abs(c.length - targetLen) <= 3);
-        
-        if (similarLength.length <= maxCount) {
-            return similarLength;
-        }
-        
-        // Strategy 3: Take first maxCount from similar length candidates
-        return similarLength.slice(0, maxCount);
-    }
-
-    private levenshteinDistance(a: string, b: string): number {
-        // Optimization: if strings are identical, return 0
-        if (a === b) {
-            return 0;
-        }
-
-        // Optimization: ensure 'a' is the shorter string
-        if (a.length > b.length) {
-            [a, b] = [b, a];
-        }
-
-        // Optimization: use single array instead of 2D matrix
-        const len1 = a.length;
-        const len2 = b.length;
-        
-        // Early exit for empty strings
-        if (len1 === 0) {
-            return len2;
-        }
-        if (len2 === 0) {
-            return len1;
-        }
-
-        // Use a single row for space optimization
-        let prevRow = Array(len2 + 1).fill(0).map((_, i) => i);
-        
-        for (let i = 1; i <= len1; i++) {
-            let currentRow = [i];
-            
-            for (let j = 1; j <= len2; j++) {
-                const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-                currentRow[j] = Math.min(
-                    prevRow[j] + 1,        // deletion
-                    currentRow[j - 1] + 1, // insertion
-                    prevRow[j - 1] + cost  // substitution
-                );
-            }
-            
-            prevRow = currentRow;
-        }
-
-        return prevRow[len2];
-    }
-
-    /**
      * Check for unbalanced parentheses in macro definitions
      * This helps catch potential syntax errors early
      */
@@ -920,46 +731,11 @@ export class MacroDiagnostics {
         this.diagnosticCollection.delete(document.uri);
     }
 
-    /**
-     * Get memory usage statistics for diagnostic caches
-     */
-    getMemoryUsage(): {
-        distanceCacheSize: number;
-        distanceCacheBytes: number;
-        allMacrosCacheBytes: number;
-    } {
-        // Calculate distanceCache memory
-        let distanceCacheBytes = 0;
-        for (const [key, value] of this.distanceCache.entries()) {
-            distanceCacheBytes += key.length * 2; // UTF-16 chars
-            distanceCacheBytes += 8; // number value
-            distanceCacheBytes += 40; // Map entry overhead
-        }
-        
-        // Calculate allMacrosCache memory
-        let allMacrosCacheBytes = 0;
-        if (this.allMacrosCache) {
-            for (const name of this.allMacrosCache) {
-                allMacrosCacheBytes += name.length * 2; // UTF-16 chars
-                allMacrosCacheBytes += 8; // Array element overhead
-            }
-            allMacrosCacheBytes += 40; // Array overhead
-        }
-        
-        return {
-            distanceCacheSize: this.distanceCache.size,
-            distanceCacheBytes,
-            allMacrosCacheBytes
-        };
-    }
-
     dispose() {
         if (this.debounceTimer) {
             clearTimeout(this.debounceTimer);
             this.debounceTimer = null;
         }
         this.diagnosticCollection.dispose();
-        this.distanceCache.clear();
-        this.allMacrosCache = null;
     }
 }
