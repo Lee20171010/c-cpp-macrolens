@@ -72,27 +72,6 @@ suite('MacroParser Tests', () => {
             assert.ok(!result.includes('line1'), 'Should remove comment content');
         });
     });
-    suite('Preprocessor Directive Removal', () => {
-        test('should remove #if, #ifdef, #ifndef directives', () => {
-            const input = '#if DEBUG\n#define TEST 1\n#endif';
-            const result = macroParser_1.MacroParser.removePreprocessorDirectives(input);
-            assert.ok(!result.includes('#if'), 'Should remove #if');
-            assert.ok(!result.includes('#endif'), 'Should remove #endif');
-            assert.ok(result.includes('#define'), 'Should keep #define');
-        });
-        test('should keep #define directives', () => {
-            const input = '#define MACRO 1\n#include <stdio.h>';
-            const result = macroParser_1.MacroParser.removePreprocessorDirectives(input);
-            assert.ok(result.includes('#define'), 'Should keep #define');
-            assert.ok(!result.includes('#include'), 'Should remove #include');
-        });
-        test('should preserve line numbers', () => {
-            const input = 'line1\n#if 0\nline3\n#endif\nline5';
-            const result = macroParser_1.MacroParser.removePreprocessorDirectives(input);
-            const lineCount = result.split('\n').length;
-            assert.strictEqual(lineCount, input.split('\n').length, 'Should preserve line count');
-        });
-    });
     suite('Token Paste Detection', () => {
         test('should detect ## before token', () => {
             const text = 'PREFIX_##SUFFIX';

@@ -12,34 +12,49 @@ export class MacroParser {
      * The performance difference is negligible for typical macro files.
      */
     static removeComments(content: string): string {
-        return this.removeCommentsInternal(content, {
-            multiline: true,
-            preserveNewlines: true
+        return this.removeCommentsWithPlaceholders(content).replace(/[ \t]+\n/g, '\n');
+    }
+
+    /**
+     * Remove comments using whitespace placeholders to preserve exact positions
+     * This eliminates the need for position mapping since positions remain unchanged
+     */
+    static removeCommentsWithPlaceholders(content: string): string {
+        // Fast path: if no comments exist, return as-is
+        if (!content.includes('/*') && !content.includes('//')) {
+            return content;
+        }
+        
+        // Unified regex that handles string literals, block comments, and line comments
+        const commentRegex = /((\"(?:[^\"\\]|\\.)*\")|('(?:[^'\\]|\\.)*'))|(\/\*[\s\S]*?\*\/)|(\/\/.*$)/gm;
+        
+        return content.replace(commentRegex, (match, _fullString, doubleQuoted, singleQuoted, blockComment, lineComment) => {
+            // Preserve string literals (either single or double quoted)
+            if (doubleQuoted || singleQuoted) {
+                return match;
+            }
+            
+            // Replace comments with equivalent whitespace to preserve positions
+            if (blockComment || lineComment) {
+                return match.replace(/[^\r\n]/g, ' ');
+            }
+            
+            return match;
         });
     }
 
     /**
-     * Remove comments from a single line or short text
-     * Optimized for single-line processing with token separation
+     * Remove preprocessor directives using whitespace placeholders
+     * Preserves exact positions by replacing with spaces instead of deletion
      */
-    static removeCommentsFromText(text: string): string {
-        return this.removeCommentsInternal(text, {
-            multiline: false,
-            preserveNewlines: false
-        });
-    }
-
-    /**
-     * Remove preprocessor directives from text to avoid false positives in diagnostics
-     * Removes lines starting with # EXCEPT #define (since we need to check macro definitions)
-     * Preserves line numbers by replacing with empty lines
-     */
-    static removePreprocessorDirectives(content: string): string {
+    static removePreprocessorDirectivesWithPlaceholders(content: string): string {
         // Pattern matches preprocessor directives at start of line, but NOT #define
-        // We keep #define because we want to check the macro body for undefined macros
-        // Preserves newlines to maintain line numbers for diagnostics
-        return content.replace(/^[ \t]*#(?!define\b).*$/gm, '');
+        return content.replace(/^([ \t]*#(?!define\b).*$)/gm, (match) => {
+            return match.replace(/[^\r\n]/g, ' ');
+        });
     }
+
+
 
     /**
      * Lowercase function-like macro parameters in #define declarations ONLY
@@ -53,6 +68,9 @@ export class MacroParser {
      * This prevents parameters from being flagged as undefined macros in diagnostics
      */
     static lowercaseDefineParameters(content: string): string {
+        // Detect the original newline format to preserve it
+        const hasCarriageReturn = content.includes('\r\n');
+        const newlineChar = hasCarriageReturn ? '\r\n' : '\n';
         const lines = content.split(/\r?\n/);
         const result: string[] = [];
         
@@ -72,7 +90,7 @@ export class MacroParser {
             
             while (fullDefine.endsWith('\\') && i + 1 < lines.length) {
                 i++;
-                fullDefine += '\n' + lines[i];
+                fullDefine += newlineChar + lines[i];
             }
             
             // Parse the macro
@@ -130,25 +148,19 @@ export class MacroParser {
                 }
             }
             
-            // Replace parameters in declaration and body
+            // Replace parameters in-place to preserve exact positions
             if (paramMap.size > 0) {
-                let newParamString = paramString;
-                let newBody = body;
-                
                 for (const [original, lowercase] of paramMap.entries()) {
                     // Use word boundary to match only complete identifiers
                     const regex = new RegExp(`\\b${MacroUtils.escapeRegex(original)}\\b`, 'g');
-                    newParamString = newParamString.replace(regex, lowercase);
-                    newBody = newBody.replace(regex, lowercase);
+                    fullDefine = fullDefine.replace(regex, lowercase);
                 }
-                
-                fullDefine = `#define ${macroName}(${newParamString})${newBody}`;
             }
             
             result.push(fullDefine);
         }
         
-        return result.join('\n');
+        return result.join(newlineChar);
     }
 
     /**
@@ -245,54 +257,7 @@ export class MacroParser {
         return false;
     }
 
-    /**
-     * Internal unified comment removal implementation
-     * Reduces code duplication while maintaining different behaviors for different use cases
-     */
-    private static removeCommentsInternal(content: string, options: {
-        multiline: boolean;
-        preserveNewlines: boolean;
-    }): string {
-        // Fast path: if no comments exist, return as-is
-        if (!content.includes('/*') && !content.includes('//')) {
-            return content;
-        }
-        
-        // Choose regex pattern based on multiline requirement
-        const blockCommentPattern = options.multiline ? '\\/\\*[\\s\\S]*?\\*\\/' : '\\/\\*.*?\\*\\/';
-        const flags = options.multiline ? 'gm' : 'g';
-        
-        // Unified regex that handles string literals, block comments, and line comments
-        const commentRegex = new RegExp(
-            `((\"(?:[^\"\\\\]|\\\\.)*\")|('(?:[^'\\\\]|\\\\.)*'))|(${blockCommentPattern})|(//.*$)`,
-            flags
-        );
-        
-        return content.replace(commentRegex, (match, _fullString, doubleQuoted, singleQuoted, blockComment, lineComment) => {
-            // Preserve string literals (either single or double quoted)
-            if (doubleQuoted || singleQuoted) {
-                return match;
-            }
-            
-            // Handle block comments based on options
-            if (blockComment) {
-                if (options.preserveNewlines) {
-                    // For multiline content, preserve newlines to maintain line numbers
-                    return match.replace(/[^\n]/g, '');
-                } else {
-                    // For single-line content, replace with space to maintain token separation
-                    return ' ';
-                }
-            }
-            
-            // Remove line comments completely (newline is preserved by regex in multiline mode)
-            if (lineComment) {
-                return '';
-            }
-            
-            return match;
-        });
-    }
+
 
     /**
      * Parse C/C++ macro definitions and type declarations from source code

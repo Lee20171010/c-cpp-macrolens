@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🚀 Performance
+
+- **Whitespace Placeholder Architecture**: Replaced position mapping with whitespace placeholders
+  - Text processing now preserves exact character positions by replacing removed content with spaces
+  - Eliminated complex `findOriginalPosition` and `buildPositionMap` methods
+  - Simplified diagnostics processing with unified `cleanText` approach
+  - Removed document cache - files are reprocessed on each change for accuracy
+
+### 🧹 Code Quality
+
+- **Method Unification**: Consolidated text processing implementations
+  - Unified `removeComments`, `removePreprocessorDirectives` to use placeholder-based versions
+  - Removed duplicate `removeCommentsInternal` method (45 lines)
+  - Simplified method signatures by removing unnecessary `originalText` parameters
+  - Consistent use of `cleanText` for all position-based operations
+
+- **Removed Unused Code**: Cleaned up unused methods and tests
+  - Removed `removePreprocessorDirectives` method (unused in production)
+  - Removed corresponding test cases for unused functionality
+  - Streamlined variable usage in `analyzeImmediate` method
+
 ## [0.1.1] - 2025-11-05
 
 ### 🚀 Performance

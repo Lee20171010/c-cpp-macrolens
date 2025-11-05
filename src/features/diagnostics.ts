@@ -35,18 +35,14 @@ export class MacroDiagnostics {
             return;
         }
 
-        let text = document.getText();
-
-        // Lowercase function-like macro parameters in #define to avoid false undefined warnings
-        // Example: #define FOO(BAR) (BAR + 1) -> #define FOO(bar) (bar + 1)
-        // This prevents parameters from matching uppercase identifier checks
-        // IMPORTANT: Must be done BEFORE removeComments to maintain position mapping
-        text = MacroParser.lowercaseDefineParameters(text);
-
-        // Remove comments and preprocessor directives before analyzing
-        // This avoids false positives from comments and preprocessor directive arguments
-        let cleanText = MacroParser.removeComments(text);
-        cleanText = MacroParser.removePreprocessorDirectives(cleanText);
+        // Process text with whitespace placeholders to preserve positions
+        // Order is important: comments first, then preprocessor, then parameters
+        const originalText = document.getText();
+        const cleanText = MacroParser.lowercaseDefineParameters(
+            MacroParser.removePreprocessorDirectivesWithPlaceholders(
+                MacroParser.removeCommentsWithPlaceholders(originalText)
+            )
+        );
 
         const diagnostics: vscode.Diagnostic[] = [];
 
@@ -57,13 +53,13 @@ export class MacroDiagnostics {
         // This unified approach checks both:
         // - Whether macros themselves are defined
         // - Whether their expansion results contain undefined macros
-        this.checkUndefinedMacrosInExpansions(document, text, cleanText, diagnostics);
+        this.checkUndefinedMacrosInExpansions(document, cleanText, diagnostics);
 
         // Step 3: Check for multiple definitions
-        this.checkMultipleDefinitions(document, text, cleanText, diagnostics);
+        this.checkMultipleDefinitions(document, cleanText, diagnostics);
 
         // Step 4: Check for unbalanced parentheses in macro definitions
-        this.checkUnbalancedParentheses(document, text, diagnostics);
+        this.checkUnbalancedParentheses(document, cleanText, diagnostics);
 
         this.diagnosticCollection.set(document.uri, diagnostics);
     }
@@ -76,7 +72,6 @@ export class MacroDiagnostics {
      */
     private checkUndefinedMacrosInExpansions(
         document: vscode.TextDocument,
-        originalText: string,
         cleanText: string,
         diagnostics: vscode.Diagnostic[]
     ): void {
@@ -104,25 +99,22 @@ export class MacroDiagnostics {
             
             // Check if macro itself is undefined
             if (defs.length === 0) {
-                const originalPos = this.findOriginalPosition(originalText, cleanText, callStartIndex);
-                if (originalPos !== -1) {
-                    const pos = document.positionAt(originalPos);
-                    const range = new vscode.Range(
-                        pos,
-                        pos.translate(0, macroName.length)
-                    );
+                const pos = document.positionAt(callStartIndex);
+                const range = new vscode.Range(
+                    pos,
+                    pos.translate(0, macroName.length)
+                );
 
-                    // Simplified diagnostic - suggestions will be shown in hover
-                    const diagnostic = new vscode.Diagnostic(
-                        range,
-                        `Undefined macro '${macroName}'`,
-                        vscode.DiagnosticSeverity.Warning
-                    );
-                    diagnostic.source = 'MacroLens';
-                    diagnostic.code = 'undefined-macro';
+                // Simplified diagnostic - suggestions will be shown in hover
+                const diagnostic = new vscode.Diagnostic(
+                    range,
+                    `Undefined macro '${macroName}'`,
+                    vscode.DiagnosticSeverity.Warning
+                );
+                diagnostic.source = 'MacroLens';
+                diagnostic.code = 'undefined-macro';
 
-                    diagnostics.push(diagnostic);
-                }
+                diagnostics.push(diagnostic);
                 continue;
             }
 
@@ -143,27 +135,24 @@ export class MacroDiagnostics {
             const expansionResult = this.expander.expand(macroName, args);
 
             if (expansionResult.undefinedMacros && expansionResult.undefinedMacros.size > 0) {
-                const originalPos = this.findOriginalPosition(originalText, cleanText, callStartIndex);
-                if (originalPos !== -1) {
-                    const pos = document.positionAt(originalPos);
-                    const range = new vscode.Range(
-                        pos,
-                        pos.translate(0, macroName.length)
-                    );
+                const pos = document.positionAt(callStartIndex);
+                const range = new vscode.Range(
+                    pos,
+                    pos.translate(0, macroName.length)
+                );
 
-                    // Simplified diagnostic - suggestions will be shown in hover
-                    const undefinedList = Array.from(expansionResult.undefinedMacros).join(', ');
+                // Simplified diagnostic - suggestions will be shown in hover
+                const undefinedList = Array.from(expansionResult.undefinedMacros).join(', ');
 
-                    const diagnostic = new vscode.Diagnostic(
-                        range,
-                        `Macro '${macroName}' expands to undefined macro${expansionResult.undefinedMacros.size > 1 ? 's' : ''}: ${undefinedList}`,
-                        vscode.DiagnosticSeverity.Warning
-                    );
-                    diagnostic.source = 'MacroLens';
-                    diagnostic.code = 'macro-expansion-undefined';
+                const diagnostic = new vscode.Diagnostic(
+                    range,
+                    `Macro '${macroName}' expands to undefined macro${expansionResult.undefinedMacros.size > 1 ? 's' : ''}: ${undefinedList}`,
+                    vscode.DiagnosticSeverity.Warning
+                );
+                diagnostic.source = 'MacroLens';
+                diagnostic.code = 'macro-expansion-undefined';
 
-                    diagnostics.push(diagnostic);
-                }
+                diagnostics.push(diagnostic);
             }
         }
 
@@ -201,25 +190,22 @@ export class MacroDiagnostics {
             
             // Check if macro itself is undefined
             if (defs.length === 0) {
-                const originalPos = this.findOriginalPosition(originalText, cleanText, callStartIndex);
-                if (originalPos !== -1) {
-                    const pos = document.positionAt(originalPos);
-                    const range = new vscode.Range(
-                        pos,
-                        pos.translate(0, macroName.length)
-                    );
+                const pos = document.positionAt(callStartIndex);
+                const range = new vscode.Range(
+                    pos,
+                    pos.translate(0, macroName.length)
+                );
 
-                    // Simplified diagnostic - suggestions will be shown in hover
-                    const diagnostic = new vscode.Diagnostic(
-                        range,
-                        `Undefined macro '${macroName}'`,
-                        vscode.DiagnosticSeverity.Warning
-                    );
-                    diagnostic.source = 'MacroLens';
-                    diagnostic.code = 'undefined-macro';
+                // Simplified diagnostic - suggestions will be shown in hover
+                const diagnostic = new vscode.Diagnostic(
+                    range,
+                    `Undefined macro '${macroName}'`,
+                    vscode.DiagnosticSeverity.Warning
+                );
+                diagnostic.source = 'MacroLens';
+                diagnostic.code = 'undefined-macro';
 
-                    diagnostics.push(diagnostic);
-                }
+                diagnostics.push(diagnostic);
                 continue;
             }
 
@@ -237,27 +223,24 @@ export class MacroDiagnostics {
             const expansionResult = this.expander.expand(macroName);
 
             if (expansionResult.undefinedMacros && expansionResult.undefinedMacros.size > 0) {
-                const originalPos = this.findOriginalPosition(originalText, cleanText, callStartIndex);
-                if (originalPos !== -1) {
-                    const pos = document.positionAt(originalPos);
-                    const range = new vscode.Range(
-                        pos,
-                        pos.translate(0, macroName.length)
-                    );
+                const pos = document.positionAt(callStartIndex);
+                const range = new vscode.Range(
+                    pos,
+                    pos.translate(0, macroName.length)
+                );
 
-                    // Simplified diagnostic - suggestions will be shown in hover
-                    const undefinedList = Array.from(expansionResult.undefinedMacros).join(', ');
+                // Simplified diagnostic - suggestions will be shown in hover
+                const undefinedList = Array.from(expansionResult.undefinedMacros).join(', ');
 
-                    const diagnostic = new vscode.Diagnostic(
-                        range,
-                        `Macro '${macroName}' expands to undefined macro${expansionResult.undefinedMacros.size > 1 ? 's' : ''}: ${undefinedList}`,
-                        vscode.DiagnosticSeverity.Warning
-                    );
-                    diagnostic.source = 'MacroLens';
-                    diagnostic.code = 'macro-expansion-undefined';
+                const diagnostic = new vscode.Diagnostic(
+                    range,
+                    `Macro '${macroName}' expands to undefined macro${expansionResult.undefinedMacros.size > 1 ? 's' : ''}: ${undefinedList}`,
+                    vscode.DiagnosticSeverity.Warning
+                );
+                diagnostic.source = 'MacroLens';
+                diagnostic.code = 'macro-expansion-undefined';
 
-                    diagnostics.push(diagnostic);
-                }
+                diagnostics.push(diagnostic);
             }
         }
     }
@@ -370,119 +353,26 @@ export class MacroDiagnostics {
             }
 
             if (hasError) {
-                // Find the position in the original text
-                const originalPos = this.findOriginalPosition(document.getText(), cleanText, callStartIndex);
-                if (originalPos !== -1) {
-                    const pos = document.positionAt(originalPos);
-                    const range = new vscode.Range(
-                        pos,
-                        pos.translate(0, macroName.length)
-                    );
+                // Position is now directly available since we use whitespace placeholders
+                const pos = document.positionAt(callStartIndex);
+                const range = new vscode.Range(
+                    pos,
+                    pos.translate(0, macroName.length)
+                );
 
-                    const diagnostic = new vscode.Diagnostic(
-                        range,
-                        errorMessage,
-                        vscode.DiagnosticSeverity.Error
-                    );
-                    diagnostic.source = 'MacroLens';
-                    diagnostic.code = 'macro-argument-count';
+                const diagnostic = new vscode.Diagnostic(
+                    range,
+                    errorMessage,
+                    vscode.DiagnosticSeverity.Error
+                );
+                diagnostic.source = 'MacroLens';
+                diagnostic.code = 'macro-argument-count';
 
-                    diagnostics.push(diagnostic);
-                }
+                diagnostics.push(diagnostic);
             }
         }
     }
 
-    /**
-     * Find the corresponding position in original text for a position in cleaned text
-     */
-    private findOriginalPosition(originalText: string, cleanText: string, cleanPos: number): number {
-        // Build a reverse mapping: cleanedPos -> originalPos
-        const cleanToOrigMap = new Map<number, number>();
-        let originalIndex = 0;
-        let cleanedIndex = 0;
-        
-        while (originalIndex < originalText.length && cleanedIndex < cleanText.length) {
-            if (originalText[originalIndex] === cleanText[cleanedIndex]) {
-                // Characters match - record the reverse mapping
-                cleanToOrigMap.set(cleanedIndex, originalIndex);
-                originalIndex++;
-                cleanedIndex++;
-            } else {
-                // Character exists in original but not in cleaned (e.g., comment)
-                originalIndex++;
-            }
-        }
-        
-        // Look up the original position for the given clean position
-        return cleanToOrigMap.get(cleanPos) ?? -1;
-    }
-
-    /**
-     * Find all positions of a macro in the original text (excluding occurrences in comments and #define bodies)
-     * This is done by checking if each occurrence appears at the corresponding position in cleaned text
-     * and is not inside a #define macro body
-     */
-    private findMacroPositionsInOriginalText(originalText: string, cleanText: string, macroName: string): number[] {
-        const positions: number[] = [];
-        const macroRegex = new RegExp(`\\b${this.escapeRegex(macroName)}\\b`, 'g');
-        let match;
-        
-        // Build a position mapping from original to cleaned text
-        const positionMap = this.buildPositionMap(originalText, cleanText);
-        
-        // Find all occurrences in original text
-        while ((match = macroRegex.exec(originalText)) !== null) {
-            const originalPos = match.index;
-            const cleanedPos = positionMap.get(originalPos);
-            
-            // Only include if this position exists in cleaned text (not in a comment)
-            if (cleanedPos !== undefined) {
-                // Verify the macro name appears at this position in cleaned text
-                if (cleanText.substring(cleanedPos, cleanedPos + macroName.length) === macroName) {
-                    // Check if this position is inside a #define body
-                    // Skip it if it is, as it should be checked via expansion instead
-                    if (!MacroParser.isInsideDefineBody(originalText, originalPos)) {
-                        positions.push(originalPos);
-                    }
-                }
-            }
-        }
-        
-        return positions;
-    }
-    
-    /**
-     * Build a mapping from original text positions to cleaned text positions
-     * Positions inside comments will not have a mapping
-     * 
-     * Note: originalText may have lowercased parameters from lowercaseDefineParameters
-     */
-    private buildPositionMap(originalText: string, cleanText: string): Map<number, number> {
-        const map = new Map<number, number>();
-        let originalIndex = 0;
-        let cleanedIndex = 0;
-        
-        while (originalIndex < originalText.length && cleanedIndex < cleanText.length) {
-            const origChar = originalText[originalIndex];
-            const cleanChar = cleanText[cleanedIndex];
-            
-            if (origChar === cleanChar || origChar.toLowerCase() === cleanChar.toLowerCase()) {
-                // Characters match (exact or case-insensitive) - record the position mapping
-                // This handles both normal characters and lowercased parameters
-                map.set(originalIndex, cleanedIndex);
-                originalIndex++;
-                cleanedIndex++;
-            } else {
-                // Characters don't match - this position in original is removed (comment)
-                // Just advance original index
-                originalIndex++;
-            }
-        }
-        
-        return map;
-    }
-    
     /**
      * Escape special regex characters in a string
      */
@@ -526,7 +416,6 @@ export class MacroDiagnostics {
      */
     private checkMultipleDefinitions(
         document: vscode.TextDocument,
-        originalText: string,
         cleanText: string,
         diagnostics: vscode.Diagnostic[]
     ): void {
@@ -570,11 +459,23 @@ export class MacroDiagnostics {
             
             // Check for multiple definitions
             if (defs.length > 1) {
-                const positions = this.findMacroPositionsInOriginalText(originalText, cleanText, macroName);
+                // Find all positions of this macro in cleanText (positions are now accurate)
+                const positions: number[] = [];
+                const macroRegex = new RegExp(`\\b${this.escapeRegex(macroName)}\\b`, 'g');
+                let match;
+                
+                while ((match = macroRegex.exec(cleanText)) !== null) {
+                    const position = match.index;
+                    // Skip if inside #define body (checked by MacroParser)
+                    if (!MacroParser.isInsideDefineBody(cleanText, position)) {
+                        positions.push(position);
+                    }
+                }
+                
                 const locations = defs.map(def => `${def.file}:${def.line}`).join(', ');
                 
-                for (const originalIndex of positions) {
-                    const pos = document.positionAt(originalIndex);
+                for (const position of positions) {
+                    const pos = document.positionAt(position);
                     const range = new vscode.Range(
                         pos,
                         pos.translate(0, macroName.length)
@@ -600,11 +501,11 @@ export class MacroDiagnostics {
      */
     private checkUnbalancedParentheses(
         document: vscode.TextDocument,
-        text: string,
+        cleanText: string,
         diagnostics: vscode.Diagnostic[]
     ): void {
         // Find all #define lines
-        const lines = text.split(/\r?\n/);
+        const lines = cleanText.split(/\r?\n/);
         let currentLine = 0;
 
         for (let i = 0; i < lines.length; i++) {
