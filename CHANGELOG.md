@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2025-11-06
+
 ### 🚀 Performance
 
 - **Whitespace Placeholder Architecture**: Replaced position mapping with whitespace placeholders
@@ -27,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed `removePreprocessorDirectives` method (unused in production)
   - Removed corresponding test cases for unused functionality
   - Streamlined variable usage in `analyzeImmediate` method
+
+### 🐛 Bug Fixes
+
+- **Diagnostic Position Accuracy**: Fixed incorrect diagnostic positions
+  - Fixed `lowercaseDefineParameters` to preserve exact character positions
+  - Changed from string reconstruction to in-place replacement
+  - Preserved original newline format (`\r\n` vs `\n`) to maintain position accuracy
 
 ## [0.1.1] - 2025-11-05
 
