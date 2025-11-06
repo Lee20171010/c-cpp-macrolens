@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2025-11-06
+
+### 🐛 Bug Fixes
+
+- **Multi-line Macro Call Support**: Fixed hover provider to correctly handle macro calls spanning multiple lines
+  - Read up to 50 lines (or 5000 characters) from cursor position to capture complete macro calls
+  - Support for backslash line continuations in macro arguments (e.g., `FOO(arg1, \ arg2)`)
+  - Calculate character position relative to line start for accurate macro detection
+  - Fixed `findMacroAtPosition` return type to always return non-null result
+
+- **Argument Extraction Normalization**: Fixed extractArguments to handle multiline macro calls
+  - Remove backslash line continuations (`\` followed by newlines) from extracted arguments
+  - Normalize whitespace in arguments to prevent false diagnostics
+  - Applied regex pattern `/\\\s*[\r\n]+\s*/g` to clean line continuation characters
+  - Fixes false positive "undefined macro" diagnostics caused by malformed arguments
+
+### 🚀 Performance
+
+- **Comment Removal in Hover**: Added comment filtering before macro parsing
+  - Remove comments using `MacroParser.removeCommentsWithPlaceholders` to avoid interference
+  - Prevents comments containing parentheses or commas from breaking macro argument parsing
+  - Maintains position accuracy using whitespace placeholders
+  - Consistent with diagnostics processing approach
+
 ## [0.1.2] - 2025-11-06
 
 ### 🚀 Performance

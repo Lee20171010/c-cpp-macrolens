@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { MacroDatabase } from '../core/macroDb';
 import { MacroExpander } from '../core/macroExpander';
 import { MacroUtils } from '../utils/macroUtils';
+import { MacroParser } from '../core/macroParser';
 import { Configuration } from '../configuration';
 import { SUGGESTION_CONSTANTS } from '../utils/constants';
 
@@ -28,27 +29,41 @@ export class MacroHoverProvider implements vscode.HoverProvider {
         position: vscode.Position
     ): Promise<vscode.Hover | undefined> {
         const line = document.lineAt(position);
-        const lineText = line.text;
         
         // First get the current word as fallback
         const wordRange = document.getWordRangeAtPosition(position);
         const currentWord = wordRange ? document.getText(wordRange) : '';
         
-        // Try to find complete macro call (including parameters)
-        const macroMatch = this.findMacroAtPosition(lineText, position.character, currentWord);
+        // Read multi-line text to handle macro calls spanning multiple lines
+        // Read from current line start, extending downward to capture complete macro call
+        const startOffset = document.offsetAt(new vscode.Position(position.line, 0));
+        const cursorOffset = document.offsetAt(position);
         
-        let macroName: string;
-        let args: string[] | undefined;
+        // Read sufficient text: up to 50 lines or 5000 chars to capture macro arguments
+        const endLine = Math.min(position.line + 50, document.lineCount - 1);
+        const endOffset = document.offsetAt(new vscode.Position(endLine, document.lineAt(endLine).text.length));
+        const maxOffset = Math.min(endOffset, startOffset + 5000);
         
-        if (macroMatch) {
-            macroName = macroMatch.macroName;
-            args = macroMatch.args;
-        } else {
-            if (!currentWord) {
-                return undefined;
-            }
-            macroName = currentWord;
-            args = undefined;
+        const textFromLineStart = document.getText(new vscode.Range(
+            document.positionAt(startOffset),
+            document.positionAt(maxOffset)
+        ));
+        
+        // Remove comments to avoid interference with macro parsing
+        const cleanText = MacroParser.removeCommentsWithPlaceholders(textFromLineStart);
+        
+        // Calculate character position relative to line start
+        const characterInText = cursorOffset - startOffset;
+        
+        // Try to find complete macro call (including multi-line parameters)
+        const macroMatch = this.findMacroAtPosition(cleanText, characterInText, currentWord);
+        
+        const macroName = macroMatch.macroName;
+        const args = macroMatch.args;
+        
+        // No macro name found at cursor position
+        if (!macroName) {
+            return undefined;
         }
         
         const defs = this.db.getDefinitions(macroName);
@@ -123,7 +138,7 @@ export class MacroHoverProvider implements vscode.HoverProvider {
         return new vscode.Hover(content, hoverRange);
     }
 
-    private findMacroAtPosition(lineText: string, character: number, currentWord: string): { macroName: string; args?: string[] } | null {
+    private findMacroAtPosition(lineText: string, character: number, currentWord: string): { macroName: string; args?: string[] } {
         const result = MacroUtils.findMacroAtPosition(lineText, character);
         return result || { macroName: currentWord };
     }

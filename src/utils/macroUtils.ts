@@ -85,8 +85,11 @@ export class MacroUtils {
             } else if (char === ')') {
                 if (depth === 0) {
                     // End of argument list
-                    if (current.trim()) {
-                        args.push(current.trim());
+                    const trimmed = current.trim();
+                    if (trimmed) {
+                        // Normalize whitespace: remove line continuations and extra whitespace
+                        const normalized = trimmed.replace(/\\\s*[\r\n]+\s*/g, ' ').replace(/\s+/g, ' ');
+                        args.push(normalized);
                     }
                     return { args, endIndex: i + 1 };
                 }
@@ -94,7 +97,12 @@ export class MacroUtils {
                 current += char;
             } else if (char === ',' && depth === 0) {
                 // Argument separator at top level
-                args.push(current.trim());
+                const trimmed = current.trim();
+                if (trimmed) {
+                    // Normalize whitespace: remove line continuations and extra whitespace
+                    const normalized = trimmed.replace(/\\\s*[\r\n]+\s*/g, ' ').replace(/\s+/g, ' ');
+                    args.push(normalized);
+                }
                 current = '';
             } else {
                 current += char;
