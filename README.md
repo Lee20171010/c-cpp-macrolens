@@ -267,6 +267,25 @@ MacroLens Extension
 - **esbuild** - Fast bundling and minification
 - **VS Code Extension API** - Native integration
 
+## ⚠️ Known Limitations
+
+### Macro Naming Convention
+- **Uppercase assumption**: The extension assumes macros follow the conventional uppercase naming (e.g., `FOO`, `MAX_VALUE`)
+- Lowercase or mixed-case macros may not be detected by diagnostics
+- This is a common C/C++ convention, but not enforced by the C preprocessor
+
+### Simplified Expansion Model
+- **No build system integration**: The extension does not perform actual preprocessing or compilation
+- **Simple text substitution**: Macros are expanded using a custom parser, not the C preprocessor
+- **No include tracking**: All macros in the database are considered available, regardless of `#include` directives
+- **No conditional compilation**: `#ifdef`, `#ifndef`, and `#if` directives are not evaluated
+- The expansion shows what *would* happen if the macro were available, not what *will* happen during actual compilation
+
+### Performance Considerations
+- Large files (>5MB) may be skipped automatically
+- Very large workspaces (>10,000 files) may experience slower initial scanning
+- Real-time updates depend on file save events; unsaved changes are not reflected
+
 ## 📚 Documentation
 
 - **[DEVELOPER.md](DEVELOPER.md)** - Development setup, architecture, and build instructions
