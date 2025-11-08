@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🐛 Bug Fixes
+
+- **Nested Macro Hover**: Fixed hover display to show the innermost macro at cursor position
+  - Changed `findMacroAtPosition` to return the most specific (smallest range) macro when multiple macros overlap
+  - Previously showed outermost macro when cursor was on nested macro calls like `NESTED(WRAPPER(5))`
+  - Now correctly identifies and displays the macro directly under the cursor
+  - Algorithm collects all matching macros and selects the one with smallest character range
+
 ## [0.1.3] - 2025-11-06
 
 ### 🐛 Bug Fixes

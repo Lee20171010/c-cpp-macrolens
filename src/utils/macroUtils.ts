@@ -17,6 +17,9 @@ export class MacroUtils {
         let match;
         REGEX_PATTERNS.MACRO_WITH_CALL.lastIndex = 0;
         
+        // Collect all macros that contain the cursor position
+        const candidates: Array<{ macroName: string; args?: string[]; startPos: number; endPos: number }> = [];
+        
         while ((match = REGEX_PATTERNS.MACRO_WITH_CALL.exec(lineText)) !== null) {
             const macroName = match[1];
             const hasParen = match[2] === '(';
@@ -26,7 +29,7 @@ export class MacroUtils {
                 // Object-like macro or macro name without call
                 const endPos = match.index + macroName.length;
                 if (character >= startPos && character <= endPos) {
-                    return { macroName };
+                    candidates.push({ macroName, startPos, endPos });
                 }
                 continue;
             }
@@ -44,11 +47,20 @@ export class MacroUtils {
             
             // Check if cursor is within this macro call range
             if (character >= startPos && character <= endIndex) {
-                return { macroName, args };
+                candidates.push({ macroName, args, startPos, endPos: endIndex });
             }
         }
         
-        return null;
+        // Return the smallest (most specific) macro that contains the cursor
+        if (candidates.length === 0) {
+            return null;
+        }
+        
+        // Sort by range size (smallest first)
+        candidates.sort((a, b) => (a.endPos - a.startPos) - (b.endPos - b.startPos));
+        
+        const best = candidates[0];
+        return { macroName: best.macroName, args: best.args };
     }
     /**
      * Extract function arguments from macro invocation text
