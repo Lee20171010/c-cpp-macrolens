@@ -349,9 +349,18 @@ export class MacroParser {
                         
                         // Everything after the closing paren is the body
                         body = firstNonSpace.substring(paramEndIndex + 1).trim();
+                        
+                        // Check for unbalanced parentheses: extra ) after parameter list
+                        if (body.startsWith(')')) {
+                            // Extra closing paren detected (e.g., #define TST(a, b)) (a+b))
+                            body = '/*UNBALANCED*/ ' + firstNonSpace.trim();
+                            params = undefined;
+                        }
                     } else {
-                        // No matching closing paren found - treat entire rest as body
-                        body = firstNonSpace.trim();
+                        // No matching closing paren found (e.g., #define TST(a, b (a+b))
+                        // Mark as unbalanced
+                        body = '/*UNBALANCED*/ ' + firstNonSpace.trim();
+                        params = undefined;
                     }
                 } else {
                     // Object-like macro - everything after name is body

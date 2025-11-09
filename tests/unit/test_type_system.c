@@ -41,33 +41,33 @@ union Value {
 // ============================================================================
 
 // Direct undefined macro (should show warning)
-#define USES_UNDEFINED FOO + BAR
+#define TSYS_USES_UNDEFINED FOO + BAR
 // FOO and BAR should trigger warnings with suggestions
 
 // Macro expanding to undefined
-#define LEVEL_A LEVEL_B
-#define LEVEL_B UNDEFINED_LEVEL_C
+#define TSYS_LEVEL_A TSYS_LEVEL_B
+#define TSYS_LEVEL_B UNDEFINED_LEVEL_C
 // Should warn about UNDEFINED_LEVEL_C with suggestions
 
 // Multiple undefined in expansion
-#define COMPLEX_UNDEFINED (FOX + BEAR + TIGER)
+#define TSYS_COMPLEX_UNDEFINED (FOX + BEAR + TIGER)
 // All three should trigger warnings
 
 // Function-like macro with undefined
-#define CALC(x) ((x) + UNDEFINED_CONSTANT)
+#define TSYS_CALC(x) ((x) + UNDEFINED_CONSTANT)
 // UNDEFINED_CONSTANT should trigger warning
 
 // ============================================================================
 // CORRECT USAGE (No warnings expected)
 // ============================================================================
 
-#define VALID_A 100
-#define VALID_B VALID_A
-#define VALID_C (VALID_A + VALID_B)
+#define TSYS_VALID_A 100
+#define TSYS_VALID_B TSYS_VALID_A
+#define TSYS_VALID_C (TSYS_VALID_A + TSYS_VALID_B)
 // No warnings - all defined
 
 // Parameters in function-like macros
-#define GOOD_FUNC(PARAM) ((PARAM) * 2)
+#define TSYS_GOOD_FUNC(PARAM) ((PARAM) * 2)
 // PARAM should NOT trigger warning
 
 // ============================================================================
@@ -75,14 +75,14 @@ union Value {
 // ============================================================================
 
 // Similar names that should trigger suggestions
-#define FOO 1
-int x = FOX;  // Should suggest: FOO
+#define TSYS_FOO 1
+int x = FOX;  // Should suggest: TSYS_FOO
 
-#define BUFFER_SIZE 1024
-int y = BUFER_SIZE;  // Typo - should suggest: BUFFER_SIZE
+#define TSYS_BUFFER_SIZE 1024
+int y = BUFER_SIZE;  // Typo - should suggest: TSYS_BUFFER_SIZE
 
-#define MAX_VALUE 999
-int z = MAX_VALU;  // Should suggest: MAX_VALUE
+#define TSYS_MAX_VALUE 999
+int z = MAX_VALU;  // Should suggest: TSYS_MAX_VALUE
 
 // ============================================================================
 // PREPROCESSOR DIRECTIVES (Should be filtered from diagnostics)

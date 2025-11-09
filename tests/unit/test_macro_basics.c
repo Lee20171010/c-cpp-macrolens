@@ -5,12 +5,12 @@
 // OBJECT-LIKE MACROS
 // ============================================================================
 
-#define PI 3.14159
-#define VERSION 1
-#define STATUS "OK"
+#define BASIC_PI 3.14159
+#define BASIC_VERSION 1
+#define BASIC_STATUS "OK"
 
 // Multi-line object-like macro
-#define LONG_DEFINITION \
+#define BASIC_LONG_DEFINITION \
     This is a very long macro definition \
     that spans multiple lines \
     using backslash continuation
@@ -20,55 +20,55 @@
 // ============================================================================
 
 // Simple function-like macro
-#define SQUARE(x) ((x) * (x))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define BASIC_SQUARE(x) ((x) * (x))
+#define BASIC_MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // Multi-line function-like macro
-#define SWAP(a, b, type) do { \
+#define BASIC_SWAP(a, b, type) do { \
     type temp = (a); \
     (a) = (b); \
     (b) = temp; \
 } while(0)
 
 // Multiple parameters
-#define ADD3(x, y, z) ((x) + (y) + (z))
+#define BASIC_ADD3(x, y, z) ((x) + (y) + (z))
 
 // Nested macro calls
-#define DOUBLE(x) ((x) * 2)
-#define QUAD(x) DOUBLE(DOUBLE(x))
+#define BASIC_DOUBLE(x) ((x) * 2)
+#define BASIC_QUAD(x) BASIC_DOUBLE(BASIC_DOUBLE(x))
 
 // ============================================================================
 // PARAMETER HANDLING
 // ============================================================================
 
 // Parameters should NOT be diagnosed as undefined
-#define FUNC(PARAM1, PARAM2) ((PARAM1) + (PARAM2))
+#define BASIC_FUNC(PARAM1, PARAM2) ((PARAM1) + (PARAM2))
 
 // Uppercase parameters (common in macros)
-#define CONCAT_IMPL(A, B) A##B
+#define BASIC_CONCAT_IMPL(A, B) A##B
 
 // Single character parameters
-#define ADD(a, b) ((a) + (b))
+#define BASIC_ADD(a, b) ((a) + (b))
 
 // Parameters with underscores
-#define CHECK(_X, _Y) ((_X) == (_Y))
+#define BASIC_CHECK(_X, _Y) ((_X) == (_Y))
 
 // ============================================================================
 // EDGE CASES
 // ============================================================================
 
 // Empty macro
-#define EMPTY
+#define BASIC_EMPTY
 
 // Macro with just parentheses
-#define PARENS ()
+#define BASIC_PARENS ()
 
 // Recursive definition (will cause circular reference error)
-#define SELF SELF
+#define BASIC_SELF BASIC_SELF
 
 int main() {
-    float circle = PI;
-    int max_val = MAX(10, 20);
-    int sum = ADD3(1, 2, 3);
+    float circle = BASIC_PI;
+    int max_val = BASIC_MAX(10, 20);
+    int sum = BASIC_ADD3(1, 2, 3);
     return 0;
 }

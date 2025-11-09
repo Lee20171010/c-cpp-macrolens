@@ -147,6 +147,11 @@ export class MacroExpander {
 
         const def = defs[0];
         
+        // Check for unbalanced parentheses in macro definition
+        if (def.body.startsWith('/*UNBALANCED*/')) {
+            throw new Error(`Macro '${macroName}' has unbalanced parentheses in definition`);
+        }
+        
         // Skip if this is not a #define macro (typedef, struct, enum, union, etc.)
         if (def.isDefine === false) {
             return macroName;
@@ -268,6 +273,11 @@ export class MacroExpander {
             
             const def = defs[0];
             
+            // Check for unbalanced parentheses in macro definition
+            if (def.body.startsWith('/*UNBALANCED*/')) {
+                throw new Error(`Macro '${macro.name}' has unbalanced parentheses in definition`);
+            }
+            
             // Check parameter matching
             if (def.params && def.params.length > 0) {
                 // Handle variadic macros (params ending with ...)
@@ -349,6 +359,11 @@ export class MacroExpander {
         }
 
         const def = defs[0];
+        
+        // Check for unbalanced parentheses in macro definition
+        if (def.body.startsWith('/*UNBALANCED*/')) {
+            throw new Error(`Macro '${macro.name}' has unbalanced parentheses in definition`);
+        }
         
         // Check parameter matching
         if (def.params && def.params.length > 0) {

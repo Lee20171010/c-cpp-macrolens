@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Features
+
+- **Unbalanced Parentheses Detection**: Comprehensive detection of syntax errors in macro definitions
+  - Detect unbalanced parentheses in function-like macro parameter lists (Error)
+  - Detect unbalanced parentheses in macro body (Warning)
+  - Show clear error messages distinguishing between parameter list errors and body warnings
+  - Prevent expansion of macros with unbalanced parentheses
+  - Display special hover messages for unbalanced macros with helpful error information
+
 ### 🐛 Bug Fixes
+
+- **Duplicate Diagnostics**: Fixed duplicate error reporting for unbalanced parentheses
+  - Adjusted diagnostic execution order to check definitions before usage
+  - Added `isDefineLine` check to skip reporting usage errors for macro definitions
+  - Prevents double reporting when a macro definition itself has unbalanced parentheses
+  - Only reports usage errors (`unbalanced-parentheses-usage`) for actual macro calls
 
 - **Nested Macro Hover**: Fixed hover display to show the innermost macro at cursor position
   - Changed `findMacroAtPosition` to return the most specific (smallest range) macro when multiple macros overlap

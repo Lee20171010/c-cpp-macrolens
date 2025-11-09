@@ -49,17 +49,17 @@ export class MacroDiagnostics {
         // Step 1: Check for argument count mismatches in function-like macro calls
         this.checkArgumentCountMismatches(document, cleanText, diagnostics);
 
-        // Step 2: Check for undefined macros and expansion results
+        // Step 2: Check for unbalanced parentheses in macro definitions (must run before expansion checks)
+        this.checkUnbalancedParentheses(document, cleanText, diagnostics);
+
+        // Step 3: Check for undefined macros and expansion results
         // This unified approach checks both:
         // - Whether macros themselves are defined
         // - Whether their expansion results contain undefined macros
         this.checkUndefinedMacrosInExpansions(document, cleanText, diagnostics);
 
-        // Step 3: Check for multiple definitions
+        // Step 4: Check for multiple definitions
         this.checkMultipleDefinitions(document, cleanText, diagnostics);
-
-        // Step 4: Check for unbalanced parentheses in macro definitions
-        this.checkUnbalancedParentheses(document, cleanText, diagnostics);
 
         this.diagnosticCollection.set(document.uri, diagnostics);
     }
@@ -133,6 +133,37 @@ export class MacroDiagnostics {
 
             // Expand the macro and check for undefined macros in the result
             const expansionResult = this.expander.expand(macroName, args);
+
+            // Check for unbalanced parentheses errors
+            if (expansionResult.hasErrors && 
+                expansionResult.errorMessage && 
+                expansionResult.errorMessage.includes('unbalanced parentheses')) {
+                
+                // Skip if this is a #define statement (not a macro call)
+                // We only want to report usage errors, not definition errors
+                if (!this.isDefineLine(cleanText, callStartIndex)) {
+                    const pos = document.positionAt(callStartIndex);
+                    const range = new vscode.Range(
+                        pos,
+                        pos.translate(0, macroName.length)
+                    );
+
+                    // Extract the unbalanced macro name from error message
+                    const unbalancedMatch = expansionResult.errorMessage.match(/Macro '(\w+)'/);
+                    const unbalancedMacroName = unbalancedMatch ? unbalancedMatch[1] : 'unknown';
+
+                    const diagnostic = new vscode.Diagnostic(
+                        range,
+                        `Macro '${macroName}' expands to '${unbalancedMacroName}' which has unbalanced parentheses`,
+                        vscode.DiagnosticSeverity.Error
+                    );
+                    diagnostic.source = 'MacroLens';
+                    diagnostic.code = 'unbalanced-parentheses-usage';
+
+                    diagnostics.push(diagnostic);
+                }
+                continue; // Skip further checks for this macro
+            }
 
             if (expansionResult.undefinedMacros && expansionResult.undefinedMacros.size > 0) {
                 const pos = document.positionAt(callStartIndex);
@@ -221,6 +252,37 @@ export class MacroDiagnostics {
 
             // Expand the macro and check for undefined macros in the result
             const expansionResult = this.expander.expand(macroName);
+
+            // Check for unbalanced parentheses errors
+            if (expansionResult.hasErrors && 
+                expansionResult.errorMessage && 
+                expansionResult.errorMessage.includes('unbalanced parentheses')) {
+                
+                // Skip if this is a #define statement (not a macro call)
+                // We only want to report usage errors, not definition errors
+                if (!this.isDefineLine(cleanText, callStartIndex)) {
+                    const pos = document.positionAt(callStartIndex);
+                    const range = new vscode.Range(
+                        pos,
+                        pos.translate(0, macroName.length)
+                    );
+
+                    // Extract the unbalanced macro name from error message
+                    const unbalancedMatch = expansionResult.errorMessage.match(/Macro '(\w+)'/);
+                    const unbalancedMacroName = unbalancedMatch ? unbalancedMatch[1] : 'unknown';
+
+                    const diagnostic = new vscode.Diagnostic(
+                        range,
+                        `Macro '${macroName}' expands to '${unbalancedMacroName}' which has unbalanced parentheses`,
+                        vscode.DiagnosticSeverity.Error
+                    );
+                    diagnostic.source = 'MacroLens';
+                    diagnostic.code = 'unbalanced-parentheses-usage';
+
+                    diagnostics.push(diagnostic);
+                }
+                continue; // Skip further checks for this macro
+            }
 
             if (expansionResult.undefinedMacros && expansionResult.undefinedMacros.size > 0) {
                 const pos = document.positionAt(callStartIndex);
@@ -381,6 +443,29 @@ export class MacroDiagnostics {
     }
 
     /**
+     * Check if a position is on a #define line (the macro name being defined)
+     * This prevents treating the macro name in #define as a macro call
+     */
+    private isDefineLine(text: string, position: number): boolean {
+        // Find the line containing this position
+        const lines = text.split(/\r?\n/);
+        let currentPos = 0;
+        
+        for (const line of lines) {
+            const lineEnd = currentPos + line.length;
+            
+            if (position >= currentPos && position <= lineEnd) {
+                // Check if this line is a #define
+                return /^\s*#\s*define\s+/.test(line);
+            }
+            
+            currentPos = lineEnd + 1; // +1 for newline
+        }
+        
+        return false;
+    }
+
+    /**
      * Check if a position is inside function-like macro call arguments
      * This prevents false positives when object-like macros appear as arguments
      * Example: FOO(BAR) - BAR position will return true
@@ -497,14 +582,14 @@ export class MacroDiagnostics {
 
     /**
      * Check for unbalanced parentheses in macro definitions
-     * This helps catch potential syntax errors early
+     * This checks the body content directly from source code
+     * AND checks usages of macros that have unbalanced parentheses
      */
     private checkUnbalancedParentheses(
         document: vscode.TextDocument,
         cleanText: string,
         diagnostics: vscode.Diagnostic[]
     ): void {
-        // Find all #define lines
         const lines = cleanText.split(/\r?\n/);
         let currentLine = 0;
 
@@ -513,39 +598,34 @@ export class MacroDiagnostics {
             currentLine = i;
 
             // Match #define directives
-            const defineMatch = line.match(/^\s*#\s*define\s+([A-Za-z_]\w*)(\s*\(([^)]*)\))?\s+(.*)$/);
+            // Use a more lenient regex that captures everything after the macro name
+            // This allows us to detect unbalanced parentheses
+            const defineMatch = line.match(/^\s*#\s*define\s+([A-Za-z_]\w*)(.*)/);
             if (!defineMatch) {
                 continue;
             }
 
             const macroName = defineMatch[1];
-            let body = defineMatch[4] || '';
+            const restOfLine = defineMatch[2];
+            let body = restOfLine.trim();
 
             // Handle multi-line macros with backslash continuation
-            // Note: According to C standard, backslash followed by space and then newline
-            // is technically a valid line continuation (GCC allows it with a warning)
             let j = i;
             while (j < lines.length) {
                 const currentLineRaw = lines[j];
-                // Check if line ends with backslash (with or without trailing whitespace)
-                // This matches GCC's behavior which treats "\ \n" as line continuation
                 const trimmedLine = currentLineRaw.trimEnd();
                 if (!trimmedLine.endsWith('\\')) {
                     break;
                 }
                 
-                // There's a continuation line
                 if (j + 1 >= lines.length) {
-                    break; // No more lines to continue
+                    break;
                 }
                 
                 j++;
                 const nextLine = lines[j].trim();
                 
-                // For the first line, use the body we extracted
-                // For subsequent lines, append the next line
                 if (j === i + 1) {
-                    // First continuation: remove backslash from initial body
                     body = body.trimEnd();
                     if (body.endsWith('\\')) {
                         body = body.slice(0, -1).trimEnd();
@@ -555,9 +635,23 @@ export class MacroDiagnostics {
                 body += ' ' + nextLine;
             }
 
-            // Check if parentheses are balanced in the body
-            if (!this.hasBalancedParentheses(body)) {
-                // Find the position of the macro name in the original line
+            // Check 1: Parser detected unbalanced parentheses in parameter list (from database)
+            // This is a syntax error - function-like macro with malformed parameter list
+            const defs = this.db.getDefinitions(macroName);
+            // Find the definition for this specific file and line (1-indexed)
+            const currentFilePath = document.uri.fsPath;
+            const currentLineNumber = currentLine + 1; // Convert to 1-indexed
+            const currentDef = defs.find(d => 
+                d.file === currentFilePath && d.line === currentLineNumber
+            );
+            const hasUnbalancedMarker = currentDef && currentDef.body.startsWith('/*UNBALANCED*/');
+            
+            // Check 2: Direct body content analysis (may be false positive for valid object-like macros)
+            const isBodyUnbalanced = !this.hasBalancedParentheses(body);
+
+            // Report appropriate severity based on error type
+            if (hasUnbalancedMarker) {
+                // Error: Parameter list has unbalanced parentheses (syntax error)
                 const macroNameIndex = line.indexOf(macroName);
                 if (macroNameIndex !== -1) {
                     const startPos = new vscode.Position(currentLine, macroNameIndex);
@@ -566,11 +660,29 @@ export class MacroDiagnostics {
 
                     const diagnostic = new vscode.Diagnostic(
                         range,
-                        `Macro '${macroName}' has unbalanced parentheses in its definition`,
-                        vscode.DiagnosticSeverity.Warning
+                        `Macro '${macroName}' has unbalanced parentheses in parameter list`,
+                        vscode.DiagnosticSeverity.Error
                     );
                     diagnostic.source = 'MacroLens';
                     diagnostic.code = 'unbalanced-parentheses';
+
+                    diagnostics.push(diagnostic);
+                }
+            } else if (isBodyUnbalanced) {
+                // Warning: Body has unbalanced parentheses (may be intentional for object-like macros)
+                const macroNameIndex = line.indexOf(macroName);
+                if (macroNameIndex !== -1) {
+                    const startPos = new vscode.Position(currentLine, macroNameIndex);
+                    const endPos = new vscode.Position(currentLine, macroNameIndex + macroName.length);
+                    const range = new vscode.Range(startPos, endPos);
+
+                    const diagnostic = new vscode.Diagnostic(
+                        range,
+                        `Macro '${macroName}' has unbalanced parentheses in body`,
+                        vscode.DiagnosticSeverity.Warning
+                    );
+                    diagnostic.source = 'MacroLens';
+                    diagnostic.code = 'unbalanced-parentheses-body';
 
                     diagnostics.push(diagnostic);
                 }
