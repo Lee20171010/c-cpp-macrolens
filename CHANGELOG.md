@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🐛 Bug Fixes
 
+- **Parameter Substitution Order**: Fixed incorrect macro expansion due to sequential parameter replacement
+  - Implemented two-phase replacement using placeholders to prevent parameter name conflicts
+  - Phase 1: Replace all parameter names with unique placeholders (`__PARAM_N__`)
+  - Phase 2: Replace placeholders with expanded argument values
+  - Fixes issue where later parameters would incorrectly match text already substituted by earlier parameters
+  - Example: `TST(a,b,c,d)` with `#define TST(a,b,c,d) MUL1(ADD(a,b), ADD(c,d))` now correctly expands to `((a+b)*(c+d))` instead of `((a+(c+d))*(c+d))`
+
 - **Duplicate Diagnostics**: Fixed duplicate error reporting for unbalanced parentheses
   - Adjusted diagnostic execution order to check definitions before usage
   - Added `isDefineLine` check to skip reporting usage errors for macro definitions

@@ -257,7 +257,34 @@ export class MacroUtils {
             }
         }
         
-        // Step 2: Substitute parameters
+        // Step 2: Substitute parameters using two-phase replacement to avoid conflicts
+        // Phase 1: Replace all parameters with unique placeholders
+        // Phase 2: Replace placeholders with expanded arguments
+        // This prevents sequential replacement issues where later parameters
+        // might match text already substituted by earlier parameters
+        
+        const placeholders: Map<string, string> = new Map();
+        const PLACEHOLDER_PREFIX = '\x00__PARAM_';
+        const PLACEHOLDER_SUFFIX = '__\x00';
+        
+        // Phase 1: Replace parameters with placeholders
+        for (let i = 0; i < params.length && i < args.length; i++) {
+            const param = params[i].trim();
+            
+            // Skip variadic marker
+            if (param === '...' || param.includes('...')) {
+                continue;
+            }
+            
+            const placeholder = `${PLACEHOLDER_PREFIX}${i}${PLACEHOLDER_SUFFIX}`;
+            placeholders.set(placeholder, param);
+            
+            // Replace parameter with placeholder
+            const paramPattern = new RegExp(`\\b${MacroUtils.escapeRegex(param)}\\b`, 'g');
+            result = result.replace(paramPattern, placeholder);
+        }
+        
+        // Phase 2: Replace placeholders with expanded arguments
         for (let i = 0; i < params.length && i < args.length; i++) {
             const param = params[i].trim();
             let arg = args[i];
@@ -272,17 +299,16 @@ export class MacroUtils {
                 continue;
             }
             
-            // Step 2a: Expand argument if needed
+            // Expand argument if needed
             // Arguments adjacent to ## are NOT expanded (use raw tokens)
             // Arguments in stringify position are already handled
             if (!usage.noExpand.has(param) && !usage.stringify.has(param) && expandArg) {
                 arg = expandArg(arg);
             }
             
-            // Step 2b: Replace parameter with argument
-            // Use word boundary to ensure complete parameter names
-            const paramPattern = new RegExp(`\\b${MacroUtils.escapeRegex(param)}\\b`, 'g');
-            result = result.replace(paramPattern, arg);
+            // Replace placeholder with expanded argument
+            const placeholder = `${PLACEHOLDER_PREFIX}${i}${PLACEHOLDER_SUFFIX}`;
+            result = result.replaceAll(placeholder, arg);
         }
         
         // Step 3: Handle __VA_ARGS__
