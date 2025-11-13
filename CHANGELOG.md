@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Duplicate Diagnostics**: Fixed duplicate error reporting for unbalanced parentheses
   - Adjusted diagnostic execution order to check definitions before usage
   - Added `isDefineLine` check to skip reporting usage errors for macro definitions
+
+### ⚡ Performance
+
+- **Parentheses Stripping Optimization**: Simplified `stripParentheses` algorithm
+  - Reduced code complexity from ~180 lines to ~80 lines (-55%)
+  - Removed special handling for casting, function calls, and operators
+  - Pure recursive approach: each parentheses group keeps exactly one layer
+  - Handles unbalanced parentheses gracefully without infinite loops
+  - O(n) time complexity with proper termination guarantees
   - Prevents double reporting when a macro definition itself has unbalanced parentheses
   - Only reports usage errors (`unbalanced-parentheses-usage`) for actual macro calls
 

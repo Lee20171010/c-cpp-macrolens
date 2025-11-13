@@ -507,271 +507,110 @@ export class MacroUtils {
     }
 
     /**
-     * Strip unnecessary outer parentheses from expression
-     * Smart strategy: preserves semantically important parentheses (casting, precedence, etc.)
+     * Strip unnecessary duplicate parentheses - keep only one layer per group
+     * 
+     * For each (...) group, recursively strip its content, then add back one layer.
+     * If a group is unbalanced (no matching closing paren), keep it unchanged.
+     * 
+     * Examples:
+     * - (((a))) → (a) - triple nested becomes single
+     * - ((a)) → (a) - double nested becomes single  
+     * - (a) → (a) - already single, stays single
+     * - func((a), (b)) → func((a), (b)) - each arg already has one layer
+     * - func(((a)), (b)) → func((a), (b)) - first arg stripped from 2 to 1 layer
+     * - (((a))) + ((b) → (a) + ((b) - first group balanced and stripped, second unbalanced kept
      */
     static stripParentheses(text: string): string {
-        let trimmed = text.trim();
-        const hasVariables = /[a-zA-Z_]/.test(trimmed);
-        let outerStrippedOnce = false;
-        
-        // Check for type casting patterns - preserve these
-        if (this.isCastExpression(trimmed)) {
-            return this.stripCastingParentheses(trimmed);
-        }
-        
-        // Strip outer parentheses layer by layer
-        while (trimmed.startsWith('(') && trimmed.endsWith(')')) {
-            let depth = 0;
-            let canStrip = true;
-            
-            for (let i = 0; i < trimmed.length; i++) {
-                if (trimmed[i] === '(') {
-                    depth++;
-                } else if (trimmed[i] === ')') {
-                    depth--;
-                    if (depth === 0 && i < trimmed.length - 1) {
-                        canStrip = false;
-                        break;
-                    }
-                }
-            }
-            
-            if (canStrip && depth === 0) {
-                const inner = trimmed.slice(1, -1).trim();
-                
-                // Don't strip if it's a cast expression inside
-                if (this.isCastExpression(inner)) {
-                    break;
-                }
-                
-                const hasOperators = /[+\-*\/%<>=&|^!?:]/.test(inner);
-                
-                // If has operators and variables, keep one layer when stripping from outside
-                if (hasOperators && hasVariables && !outerStrippedOnce) {
-                    outerStrippedOnce = true;
-                    trimmed = inner;
-                    continue;
-                }
-                
-                trimmed = inner;
-            } else {
-                break;
-            }
-        }
-        
-        // Recursively strip nested parentheses within sub-expressions
-        trimmed = this.stripNestedParentheses(trimmed);
-        
-        // If result has operators and variables, ensure at least one layer of parens
-        const finalHasOperators = /[+\-*\/%<>=&|^!?:]/.test(trimmed);
-        if (finalHasOperators && hasVariables && !trimmed.startsWith('(')) {
-            return '(' + trimmed + ')';
-        }
-        
-        return trimmed;
-    }
-
-    /**
-     * Check if expression is a type cast: (type)expr
-     * Recognizes both standard C types and typedef types
-     */
-    private static isCastExpression(text: string): boolean {
         const trimmed = text.trim();
         
-        // Pattern 1: Standard C types with modifiers
-        // Matches: (int), (unsigned int), (const char*), etc.
-        const standardCastPattern = /^\s*\(\s*(const\s+|volatile\s+|unsigned\s+|signed\s+)*(char|short|int|long|float|double|void|size_t|ptrdiff_t|int\d+_t|uint\d+_t|struct\s+\w+|enum\s+\w+|union\s+\w+)(\s+\*+|\s*\*+|\s+const|\s+volatile)*\s*\)\s*\S/;
-        
-        // Pattern 2: Typedef types (common naming conventions)
-        // Matches: (TST), (MYTYPE), (MyType), (mytype_t), (const TST*), etc.
-        // Format: (modifiers? TypeName pointers?) where TypeName is:
-        //   - All uppercase (TST, UINT, MYTYPE)
-        //   - CamelCase (MyType, UInt32)
-        //   - Ends with _t (mytype_t, my_type_t)
-        //   - Ends with _T (MYTYPE_T)
-        const typedefCastPattern = /^\s*\(\s*(const\s+|volatile\s+)*([A-Z][A-Z0-9_]*|[A-Z][a-zA-Z0-9]*|\w+_[tT])(\s*\*+|\s+\*+|\s+const|\s+volatile)*\s*\)\s*\S/;
-        
-        // Pattern 3: Function pointer casts
-        // Matches: (returntype (*)(params))
-        const funcPtrCastPattern = /^\s*\(\s*\w+\s*\(\s*\*+\s*\)\s*\([^)]*\)\s*\)\s*\S/;
-        
-        // Check if it's a cast pattern OR if the content inside outer parens is a cast
-        if (standardCastPattern.test(trimmed) || 
-            typedefCastPattern.test(trimmed) || 
-            funcPtrCastPattern.test(trimmed)) {
-            return true;
+        // Base case: no parentheses
+        if (!trimmed.includes('(')) {
+            return trimmed;
         }
         
-        // Check for nested case: ((type)expr)
-        // Strip outer parentheses and check again
-        if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
-            const inner = trimmed.slice(1, -1).trim();
-            if (standardCastPattern.test(inner) || 
-                typedefCastPattern.test(inner) || 
-                funcPtrCastPattern.test(inner)) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-
-    /**
-     * Strip parentheses from casting expressions intelligently
-     * E.g., ((int)((x))) -> (int)x, ((TST)(value)) -> (TST)value
-     */
-    private static stripCastingParentheses(text: string): string {
-        const trimmed = text.trim();
-        
-        // Pattern 1: Standard C types - (type)expr
-        const standardMatch = trimmed.match(/^(\(\s*(?:const\s+|volatile\s+|unsigned\s+|signed\s+)*(?:char|short|int|long|float|double|void|size_t|ptrdiff_t|int\d+_t|uint\d+_t|struct\s+\w+|enum\s+\w+|union\s+\w+)(?:\s+\*+|\s*\*+|\s+const|\s+volatile)*\s*\))\s*(.+)$/);
-        
-        if (standardMatch) {
-            const castPart = standardMatch[1];  // (type)
-            const exprPart = standardMatch[2];  // expr
-            
-            // Recursively strip the expression part
-            const strippedExpr = this.stripParentheses(exprPart);
-            
-            return castPart + strippedExpr;
-        }
-        
-        // Pattern 2: Typedef types - (modifiers? TypeName pointers?)expr
-        // Matches: (TST), (MYTYPE), (MyType), (mytype_t), (const TST*), etc.
-        const typedefMatch = trimmed.match(/^(\(\s*(?:const\s+|volatile\s+)*(?:[A-Z][A-Z0-9_]*|[A-Z][a-zA-Z0-9]*|\w+_[tT])(?:\s*\*+|\s+\*+|\s+const|\s+volatile)*\s*\))\s*(.+)$/);
-        
-        if (typedefMatch) {
-            const castPart = typedefMatch[1];  // (TypeName)
-            const exprPart = typedefMatch[2];  // expr
-            
-            // Recursively strip the expression part
-            const strippedExpr = this.stripParentheses(exprPart);
-            
-            return castPart + strippedExpr;
-        }
-        
-        return trimmed;
-    }
-
-    /**
-     * Recursively strip nested parentheses within sub-expressions
-     * Preserves structure but removes unnecessary nesting
-     * Example: ((a)) + ((b)) -> a + b
-     */
-    private static stripNestedParentheses(text: string): string {
+        // Scan and process each top-level parenthesized group
         let result = '';
         let i = 0;
         
-        while (i < text.length) {
-            if (text[i] === '(') {
-                // Find the matching closing parenthesis
-                let depth = 0;
+        while (i < trimmed.length) {
+            if (trimmed[i] === '(') {
+                // Find matching closing parenthesis
+                let depth = 1;
                 let start = i;
-                let found = false;
+                i++;
                 
-                for (let j = i; j < text.length; j++) {
-                    if (text[j] === '(') {
+                while (i < trimmed.length && depth > 0) {
+                    if (trimmed[i] === '(') {
                         depth++;
-                    } else if (text[j] === ')') {
+                    } else if (trimmed[i] === ')') {
                         depth--;
-                        if (depth === 0) {
-                            // Found matching closing parenthesis
-                            found = true;
-                            
-                            // Extract the content inside parentheses
-                            const inner = text.substring(start + 1, j);
-                            
-                            // Check if this is a cast expression
-                            const fullExpr = text.substring(start, j + 1);
-                            if (this.isCastExpression(fullExpr)) {
-                                // Preserve casting but strip its inner content
-                                result += this.stripCastingParentheses(fullExpr);
-                            } else {
-                                // Recursively strip the inner content
-                                const stripped = this.stripParentheses(inner);
-                                
-                                // Check if we need to keep the parentheses
-                                if (this.needsParentheses(stripped, result, text.substring(j + 1))) {
-                                    result += '(' + stripped + ')';
-                                } else {
-                                    result += stripped;
-                                }
-                            }
-                            
-                            i = j + 1;
-                            break;
-                        }
                     }
-                }
-                
-                // If no matching closing parenthesis found, keep the opening parenthesis as-is
-                // and move to next character to avoid infinite loop
-                if (!found) {
-                    result += text[i];
                     i++;
                 }
+                
+                // If unbalanced (no matching ')'), keep original including the '('
+                if (depth !== 0) {
+                    result += trimmed.substring(start, i);
+                    continue;
+                }
+                
+                // Extract content between parentheses
+                const innerContent = trimmed.substring(start + 1, i - 1);
+                
+                // If inner content is empty, result is ()
+                if (innerContent.trim().length === 0) {
+                    result += '()';
+                    continue;
+                }
+                
+                // Recursively strip the inner content
+                const strippedInner = this.stripParentheses(innerContent);
+                
+                // If the stripped inner content is fully wrapped by parens,
+                // don't add another layer (this IS the one layer we keep)
+                if (this.isFullyWrappedByParens(strippedInner)) {
+                    result += strippedInner;
+                } else {
+                    // Add one layer of parentheses
+                    result += '(' + strippedInner + ')';
+                }
             } else {
-                result += text[i];
+                result += trimmed[i];
                 i++;
             }
         }
         
         return result;
     }
-
+    
     /**
-     * Check if parentheses are necessary based on context
-     * Returns true if removing them would be confusing or change semantics
+     * Check if text is fully wrapped by a single pair of parentheses
+     * (a + b) → true (fully wrapped)
+     * (a), (b) → false (two separate groups)
+     * a + b → false (no parens)
      */
-    private static needsParentheses(content: string, before: string, after: string): boolean {
-        // Check if this is a function call: identifier(args)
-        // Look at what comes before the opening parenthesis
-        const beforeTrimmed = before.trim();
+    private static isFullyWrappedByParens(text: string): boolean {
+        const trimmed = text.trim();
         
-        // If before ends with an identifier (letter, digit, underscore), this is likely a function call
-        if (/[a-zA-Z0-9_]$/.test(beforeTrimmed)) {
-            // This is a function call: func(args)
-            // MUST keep parentheses!
-            return true;
-        }
-        
-        // Check if this is an array/pointer subscript: arr[index] becomes arr[(index)]
-        if (beforeTrimmed.endsWith('[')) {
-            return true;
-        }
-        
-        // Always keep parentheses for pointer dereference
-        if (content.trim().startsWith('*') && content.trim().length > 1) {
-            return true;
-        }
-        
-        // Always keep for address-of
-        if (content.trim().startsWith('&') && content.trim().length > 1) {
-            return true;
-        }
-        
-        // Check if content has comma (likely function arguments or comma operator)
-        if (content.includes(',')) {
-            // Keep if before suggests this is a function call
-            if (/[a-zA-Z0-9_]$/.test(beforeTrimmed)) {
-                return true;
-            }
-            // Also keep for comma operator in general (to be safe)
-            return true;
-        }
-        
-        // Check if content has operators that might need grouping
-        const hasOperators = /[+\-*\/%<>=&|^!?:]/.test(content);
-        
-        if (!hasOperators) {
-            // Simple value or variable - parentheses not needed
+        if (!trimmed.startsWith('(') || !trimmed.endsWith(')')) {
             return false;
         }
         
-        // Content has operators - keep parentheses to preserve grouping
-        // Example: ((x) * (y)) should become (x * y), not x * y
-        // This ensures correct operator precedence in all contexts
-        return true;
+        // Check if the opening paren at position 0 matches the closing paren at the end
+        let depth = 0;
+        
+        for (let i = 0; i < trimmed.length; i++) {
+            if (trimmed[i] === '(') {
+                depth++;
+            } else if (trimmed[i] === ')') {
+                depth--;
+                // If depth reaches 0 before the end, it's not fully wrapped
+                if (depth === 0 && i < trimmed.length - 1) {
+                    return false;
+                }
+            }
+        }
+        
+        return depth === 0;
     }
 }
