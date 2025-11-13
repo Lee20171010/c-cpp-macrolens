@@ -66,12 +66,29 @@ export class MacroParser {
      *   FOO(TST)                     ->  FOO(TST)  (unchanged)
      * 
      * This prevents parameters from being flagged as undefined macros in diagnostics
+     * 
+     * Note: Handles mixed line endings (\r\n, \r, \n) by preserving original separators
      */
     static lowercaseDefineParameters(content: string): string {
-        // Detect the original newline format to preserve it
-        const hasCarriageReturn = content.includes('\r\n');
-        const newlineChar = hasCarriageReturn ? '\r\n' : '\n';
-        const lines = content.split(/\r?\n/);
+        // Split by any newline pattern while preserving the original separators
+        const lines: string[] = [];
+        const separators: string[] = [];
+        
+        let lastIndex = 0;
+        const newlineRegex = /\r\n|\r|\n/g;
+        let match;
+        
+        while ((match = newlineRegex.exec(content)) !== null) {
+            lines.push(content.substring(lastIndex, match.index));
+            separators.push(match[0]);
+            lastIndex = match.index + match[0].length;
+        }
+        
+        // Add the last line (after the last newline)
+        if (lastIndex < content.length) {
+            lines.push(content.substring(lastIndex));
+        }
+        
         const result: string[] = [];
         
         for (let i = 0; i < lines.length; i++) {
@@ -90,7 +107,8 @@ export class MacroParser {
             
             while (fullDefine.endsWith('\\') && i + 1 < lines.length) {
                 i++;
-                fullDefine += newlineChar + lines[i];
+                // Preserve the original separator when joining continuation lines
+                fullDefine += separators[i - 1] + lines[i];
             }
             
             // Parse the macro
@@ -160,7 +178,16 @@ export class MacroParser {
             result.push(fullDefine);
         }
         
-        return result.join(newlineChar);
+        // Reconstruct content with original separators
+        const output: string[] = [];
+        for (let i = 0; i < result.length; i++) {
+            output.push(result[i]);
+            if (i < separators.length) {
+                output.push(separators[i]);
+            }
+        }
+        
+        return output.join('');
     }
 
     /**

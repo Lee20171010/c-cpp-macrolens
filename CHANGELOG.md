@@ -37,6 +37,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now correctly identifies and displays the macro directly under the cursor
   - Algorithm collects all matching macros and selects the one with smallest character range
 
+### ⚡ Performance
+
+- **Diagnostics Optimization**: Improved performance by using VS Code document API instead of manual text parsing
+  - Replaced O(n) `isDefineLine` loop with O(1) `document.lineAt()` calls
+  - Eliminated redundant text splitting in diagnostic checks
+  - Faster response time for large files
+
+- **Mixed Line Endings Support**: Enhanced `lowercaseDefineParameters` to handle mixed line endings
+  - Supports files with mixed `\r\n` (Windows), `\n` (Unix), and `\r` (old Mac) line endings
+  - Preserves original line separators when processing macro definitions
+  - Handles edge cases like copy-pasting code from different platforms
+
 ## [0.1.3] - 2025-11-06
 
 ### 🐛 Bug Fixes

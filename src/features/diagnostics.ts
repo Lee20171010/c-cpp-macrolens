@@ -141,8 +141,11 @@ export class MacroDiagnostics {
                 
                 // Skip if this is a #define statement (not a macro call)
                 // We only want to report usage errors, not definition errors
-                if (!this.isDefineLine(cleanText, callStartIndex)) {
-                    const pos = document.positionAt(callStartIndex);
+                const pos = document.positionAt(callStartIndex);
+                const line = document.lineAt(pos.line);
+                const isDefineLine = /^\s*#\s*define\s+/.test(line.text);
+                
+                if (!isDefineLine) {
                     const range = new vscode.Range(
                         pos,
                         pos.translate(0, macroName.length)
@@ -260,8 +263,11 @@ export class MacroDiagnostics {
                 
                 // Skip if this is a #define statement (not a macro call)
                 // We only want to report usage errors, not definition errors
-                if (!this.isDefineLine(cleanText, callStartIndex)) {
-                    const pos = document.positionAt(callStartIndex);
+                const pos = document.positionAt(callStartIndex);
+                const line = document.lineAt(pos.line);
+                const isDefineLine = /^\s*#\s*define\s+/.test(line.text);
+                
+                if (!isDefineLine) {
                     const range = new vscode.Range(
                         pos,
                         pos.translate(0, macroName.length)
@@ -440,29 +446,6 @@ export class MacroDiagnostics {
      */
     private escapeRegex(str: string): string {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    /**
-     * Check if a position is on a #define line (the macro name being defined)
-     * This prevents treating the macro name in #define as a macro call
-     */
-    private isDefineLine(text: string, position: number): boolean {
-        // Find the line containing this position
-        const lines = text.split(/\r?\n/);
-        let currentPos = 0;
-        
-        for (const line of lines) {
-            const lineEnd = currentPos + line.length;
-            
-            if (position >= currentPos && position <= lineEnd) {
-                // Check if this line is a #define
-                return /^\s*#\s*define\s+/.test(line);
-            }
-            
-            currentPos = lineEnd + 1; // +1 for newline
-        }
-        
-        return false;
     }
 
     /**
