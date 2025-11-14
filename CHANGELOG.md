@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2025-11-14
+
 ### ✨ Features
+
+- **Mixed Line Ending Support**: Full support for files with mixed line endings (CRLF/LF)
+  - Correctly handle macro definitions that span multiple lines with different line endings
+  - Proper parsing of backslash continuations across mixed line ending boundaries
+  - No false positives for unbalanced parentheses due to line ending inconsistencies
 
 - **Unbalanced Parentheses Detection**: Comprehensive detection of syntax errors in macro definitions
   - Detect unbalanced parentheses in function-like macro parameter lists (Error)
@@ -28,15 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Duplicate Diagnostics**: Fixed duplicate error reporting for unbalanced parentheses
   - Adjusted diagnostic execution order to check definitions before usage
   - Added `isDefineLine` check to skip reporting usage errors for macro definitions
-
-### ⚡ Performance
-
-- **Parentheses Stripping Optimization**: Simplified `stripParentheses` algorithm
-  - Reduced code complexity from ~180 lines to ~80 lines (-55%)
-  - Removed special handling for casting, function calls, and operators
-  - Pure recursive approach: each parentheses group keeps exactly one layer
-  - Handles unbalanced parentheses gracefully without infinite loops
-  - O(n) time complexity with proper termination guarantees
   - Prevents double reporting when a macro definition itself has unbalanced parentheses
   - Only reports usage errors (`unbalanced-parentheses-usage`) for actual macro calls
 
@@ -48,15 +46,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ⚡ Performance
 
+- **Parentheses Stripping Optimization**: Simplified `stripParentheses` algorithm
+  - Reduced code complexity from ~180 lines to ~80 lines (-55%)
+  - Removed special handling for casting, function calls, and operators
+  - Pure recursive approach: each parentheses group keeps exactly one layer
+  - Handles unbalanced parentheses gracefully without infinite loops
+  - O(n) time complexity with proper termination guarantees
+
 - **Diagnostics Optimization**: Improved performance by using VS Code document API instead of manual text parsing
   - Replaced O(n) `isDefineLine` loop with O(1) `document.lineAt()` calls
   - Eliminated redundant text splitting in diagnostic checks
   - Faster response time for large files
-
-- **Mixed Line Endings Support**: Enhanced `lowercaseDefineParameters` to handle mixed line endings
-  - Supports files with mixed `\r\n` (Windows), `\n` (Unix), and `\r` (old Mac) line endings
-  - Preserves original line separators when processing macro definitions
-  - Handles edge cases like copy-pasting code from different platforms
 
 ## [0.1.3] - 2025-11-06
 
