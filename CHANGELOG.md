@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Hover Definition Toggle**: Added `macrolens.hoverShowDefinition` setting to control whether MacroLens hover tooltips include the `#define` snippet, preventing duplicate content when C/C++ extension hovers are also enabled.
 
+### 🐛 Bug Fixes
+
+- **Hover Suggestion Guard**: Hover "Did you mean" suggestions now appear only for uppercase identifiers (macro-style names), preventing irrelevant recommendations for normal variables/functions.
+
+- **String Literal Macro Filtering**: Undefined-macro detection now skips uppercase tokens that appear inside string or character literals in expansion results, so text like `"ERROR"` no longer triggers false positives.
+
 ## [0.1.4] - 2025-11-14
 
 ### ✨ Features

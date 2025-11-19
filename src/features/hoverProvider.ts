@@ -140,6 +140,9 @@ export class MacroHoverProvider implements vscode.HoverProvider {
             this.refreshMacroCache();
             const undefinedWithSuggestions: string[] = [];
             for (const undefinedMacro of result.undefinedMacros) {
+                if (!this.shouldSuggestForName(undefinedMacro)) {
+                    continue;
+                }
                 const suggestions = this.findSimilarMacros(undefinedMacro, this.allMacrosCache!);
                 if (suggestions.length > 0) {
                     undefinedWithSuggestions.push(`  - \`${undefinedMacro}\`: Did you mean ${suggestions.map(s => `\`${s}\``).join(', ')}?`);
@@ -173,6 +176,9 @@ export class MacroHoverProvider implements vscode.HoverProvider {
      * Provide hover information for undefined macros with suggestions
      */
     private provideUndefinedMacroHover(macroName: string, wordRange: vscode.Range | undefined): vscode.Hover | undefined {
+        if (!this.shouldSuggestForName(macroName)) {
+            return undefined;
+        }
         // Refresh macro cache if needed
         this.refreshMacroCache();
         
@@ -206,6 +212,10 @@ export class MacroHoverProvider implements vscode.HoverProvider {
      */
     private getCurrentDbVersion(): number {
         return this.db.getAllDefinitions().size;
+    }
+
+    private shouldSuggestForName(name: string): boolean {
+        return /^[A-Z_][A-Z0-9_]*$/.test(name);
     }
 
     /**
