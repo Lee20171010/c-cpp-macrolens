@@ -2,7 +2,7 @@
   "name": "c-cpp-macrolens",
   "displayName": "C/C++ MacroLens",
   "description": "Recursive macro analysis and expansion for C/C++",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "ytlee",
   "icon": "media/icon.png",
   "license": "MIT",
