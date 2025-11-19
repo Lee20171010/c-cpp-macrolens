@@ -14,6 +14,7 @@ Hover over any macro to see:
 - **Final expanded result** with redundant parentheses stripped
 - **Multiple definition warnings** with quick navigation
 - **Undefined macro warnings** in expansion results
+- **Concatenated macro jump links** for every token produced via `##` during expansion
 - Native VS Code "Go to Definition" support (F12)
 
 ### 🌳 Interactive Tree View

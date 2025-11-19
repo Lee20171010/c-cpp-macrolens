@@ -1,6 +1,6 @@
 // The module 'vscode' contains the VS Code extensibility API
 import * as vscode from 'vscode';
-import { MacroDatabase } from './core/macroDb';
+import { MacroDatabase, MacroDef } from './core/macroDb';
 import { MacroExpander } from './core/macroExpander';
 import { MacroHoverProvider } from './features/hoverProvider';
 import { MacroDiagnostics } from './features/diagnostics';
@@ -321,6 +321,15 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
             }
         }),
 
+        vscode.commands.registerCommand('macrolens.openMacroFromHover', async (args) => {
+            const macroArg = typeof args === 'string' ? args : args?.macro;
+            if (!macroArg) {
+                vscode.window.showWarningMessage('MacroLens: No macro specified');
+                return;
+            }
+            await openMacroDefinitionFromHover(macroArg);
+        }),
+
         // Show statistics command
         vscode.commands.registerCommand('macrolens.showStatistics', async () => {
             const stats = macroDb.getStatistics();
@@ -456,6 +465,53 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
             }
         })
     );
+}
+
+async function openMacroDefinitionFromHover(macroName: string): Promise<void> {
+    if (!macroDb) {
+        vscode.window.showWarningMessage('MacroLens: Macro database is not initialized yet');
+        return;
+    }
+
+    const defs = macroDb
+        .getDefinitions(macroName)
+        .filter(def => def.isDefine !== false);
+
+    if (defs.length === 0) {
+        vscode.window.showInformationMessage(`MacroLens: No definition found for ${macroName}`);
+        return;
+    }
+
+    if (defs.length === 1) {
+        await revealMacroDefinition(defs[0]);
+        return;
+    }
+
+    const items: Array<vscode.QuickPickItem & { def: MacroDef }> = defs.map((def, index) => ({
+        label: `${macroName} (${index + 1})`,
+        description: `${vscode.workspace.asRelativePath(def.file)}:${def.line}`,
+        detail: def.body,
+        def
+    }));
+
+    const selected = await vscode.window.showQuickPick(items, {
+        placeHolder: `Choose definition for ${macroName}`,
+        matchOnDescription: true,
+        matchOnDetail: true
+    });
+
+    if (selected) {
+        await revealMacroDefinition(selected.def);
+    }
+}
+
+async function revealMacroDefinition(def: MacroDef): Promise<void> {
+    const document = await vscode.workspace.openTextDocument(def.file);
+    const editor = await vscode.window.showTextDocument(document, { preview: false });
+    const targetLine = Math.max(def.line - 1, 0);
+    const position = new vscode.Position(targetLine, 0);
+    editor.selection = new vscode.Selection(position, position);
+    editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
 }
 
 export function deactivate() {

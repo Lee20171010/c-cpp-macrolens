@@ -1,9 +1,7 @@
 import * as assert from 'assert';
-
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
 import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
+import { MacroDatabase } from '../core/macroDb';
+import { MacroExpander } from '../core/macroExpander';
 
 suite('Extension Test Suite', () => {
 	vscode.window.showInformationMessage('Start all tests.');
@@ -11,5 +9,29 @@ suite('Extension Test Suite', () => {
 	test('Sample test', () => {
 		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
 		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
+	});
+
+	test('should report final chained concatenation token', () => {
+		const db = MacroDatabase.getInstance();
+		const expander = new MacroExpander();
+		const originalDefinitions = (db as any).definitions;
+		const customDefinitions = new Map();
+		customDefinitions.set('CHAIN_ABC', [{
+			name: 'CHAIN_ABC',
+			body: 'A##B##C',
+			file: 'test.h',
+			line: 1,
+			isDefine: true
+		}]);
+
+		try {
+			(db as any).definitions = customDefinitions;
+			const result = expander.expand('CHAIN_ABC');
+
+			assert.strictEqual(result.finalText.trim(), 'ABC');
+			assert.deepStrictEqual(result.concatenatedMacros, ['ABC']);
+		} finally {
+			(db as any).definitions = originalDefinitions;
+		}
 	});
 });

@@ -1,6 +1,6 @@
 import { Configuration } from '../configuration';
 import { MacroDatabase } from './macroDb';
-import { MacroUtils } from '../utils/macroUtils';
+import { MacroUtils, ConcatenationEvent } from '../utils/macroUtils';
 import { BUILTIN_IDENTIFIERS, REGEX_PATTERNS } from '../utils/constants';
 
 export interface ExpansionStep {
@@ -19,10 +19,14 @@ export interface ExpansionResult {
     hasErrors: boolean;
     errorMessage?: string;
     undefinedMacros?: Set<string>;  // Macros found in final result but not defined
+    concatenatedMacros?: string[];  // Macro-like tokens formed via ## during expansion
 }
+
+type ConcatenatedMacroTracker = Map<string, number>;
 
 export class MacroExpander {
     private db: MacroDatabase;
+    private static readonly MACRO_NAME_REGEX = /^[A-Z_][A-Z0-9_]*$/;
 
     constructor() {
         this.db = MacroDatabase.getInstance();
@@ -31,6 +35,7 @@ export class MacroExpander {
     expand(macroName: string, args?: string[]): ExpansionResult {
         const config = Configuration.getInstance().getConfig();
         const steps: ExpansionStep[] = [];
+        const concatenatedMacros: ConcatenatedMacroTracker = new Map();
         
         const defs = this.db.getDefinitions(macroName);
         
@@ -51,7 +56,8 @@ export class MacroExpander {
                 macroName, args, steps, 
                 0,  // Initial depth level
                 config.maxExpansionDepth, 
-                expansionChain
+                expansionChain,
+                concatenatedMacros
             );
             
             let finalText = result;
@@ -63,6 +69,7 @@ export class MacroExpander {
             // Pass the macro's parameters to exclude them from undefined checks
             const params = defs.length > 0 ? defs[0].params : undefined;
             const undefinedMacros = this.findUndefinedMacrosInText(finalText, params);
+            const concatenatedList = this.getActiveConcatenatedMacros(concatenatedMacros);
 
             // Return expansion result without numeric evaluation
             return {
@@ -70,7 +77,8 @@ export class MacroExpander {
                 finalText,
                 isComplete: steps.length > 0,
                 hasErrors: false,
-                undefinedMacros: undefinedMacros.size > 0 ? undefinedMacros : undefined
+                undefinedMacros: undefinedMacros.size > 0 ? undefinedMacros : undefined,
+                concatenatedMacros: concatenatedList
             };
         } catch (error) {
             return {
@@ -176,7 +184,8 @@ export class MacroExpander {
         steps: ExpansionStep[], 
         level: number, 
         maxDepth: number,
-        expansionChain: Set<string>
+        expansionChain: Set<string>,
+        concatenatedMacros: ConcatenatedMacroTracker
     ): string {
         if (level >= maxDepth) {
             throw new Error('Maximum expansion depth reached - possible infinite recursion');
@@ -219,17 +228,33 @@ export class MacroExpander {
             // This will be called for arguments that need pre-expansion
             const expandArg = (arg: string): string => {
                 // Expand macros in the argument
-                return this.expandMacrosInText(arg, [], level + 1, maxDepth, new Set(expansionChain));
+                return this.expandMacrosInText(
+                    arg,
+                    [],
+                    level + 1,
+                    maxDepth,
+                    new Set(expansionChain),
+                    concatenatedMacros
+                );
             };
             
             // Substitute parameters with correct expansion rules
             // Arguments adjacent to ## or # are NOT expanded
             // Other arguments ARE expanded before substitution
-            expanded = MacroUtils.substituteParameters(expanded, def.params, args, expandArg);
+            expanded = MacroUtils.substituteParameters(
+                expanded,
+                def.params,
+                args,
+                expandArg,
+                event => this.recordConcatenatedMacro(event, concatenatedMacros)
+            );
         } else {
             // Object-like macro: still need to process ## token concatenation
             // Example: #define Z (L##M) should expand to (LM)
-            expanded = MacroUtils.processTokenConcatenation(expanded);
+            expanded = MacroUtils.processTokenConcatenation(
+                expanded,
+                event => this.recordConcatenatedMacro(event, concatenatedMacros)
+            );
         }
 
         // Record this expansion step
@@ -244,7 +269,14 @@ export class MacroExpander {
 
         // Find macros that need further expansion, passing the chain
         // This is the "rescan" step in standard preprocessing
-        const furtherExpanded = this.expandMacrosInText(expanded, steps, level + 1, maxDepth, expansionChain);
+        const furtherExpanded = this.expandMacrosInText(
+            expanded,
+            steps,
+            level + 1,
+            maxDepth,
+            expansionChain,
+            concatenatedMacros
+        );
         
         // Remove current macro from chain (backtrack for parallel expansions)
         expansionChain.delete(macroId);
@@ -257,7 +289,8 @@ export class MacroExpander {
         steps: ExpansionStep[], 
         level: number, 
         maxDepth: number,
-        expansionChain: Set<string>
+        expansionChain: Set<string>,
+        concatenatedMacros: ConcatenatedMacroTracker
     ): string {
         if (level >= maxDepth) {
             return text;
@@ -268,8 +301,8 @@ export class MacroExpander {
         
         while (true) {
             const expandedText = config.expansionMode === 'single-layer' 
-                ? this.expandSingleLayer(currentText, steps, level, maxDepth, expansionChain)
-                : this.expandSingleMacro(currentText, steps, level, maxDepth, expansionChain);
+                ? this.expandSingleLayer(currentText, steps, level, maxDepth, expansionChain, concatenatedMacros)
+                : this.expandSingleMacro(currentText, steps, level, maxDepth, expansionChain, concatenatedMacros);
             
             if (expandedText === currentText || level >= maxDepth) {
                 break; // No more expansions possible or max depth reached
@@ -290,7 +323,8 @@ export class MacroExpander {
         steps: ExpansionStep[], 
         level: number, 
         maxDepth: number,
-        expansionChain: Set<string>
+        expansionChain: Set<string>,
+        concatenatedMacros: ConcatenatedMacroTracker
     ): string {
         if (level >= maxDepth) {
             return text;
@@ -352,7 +386,13 @@ export class MacroExpander {
             // Perform substitution
             let substituted = def.body;
             if (def.params && def.params.length > 0 && macro.args) {
-                substituted = MacroUtils.substituteParameters(substituted, def.params, macro.args);
+                substituted = MacroUtils.substituteParameters(
+                    substituted,
+                    def.params,
+                    macro.args,
+                    undefined,
+                    event => this.recordConcatenatedMacro(event, concatenatedMacros)
+                );
             }
             
             // Replace in text
@@ -384,7 +424,8 @@ export class MacroExpander {
         steps: ExpansionStep[], 
         level: number, 
         maxDepth: number,
-        expansionChain: Set<string>
+        expansionChain: Set<string>,
+        concatenatedMacros: ConcatenatedMacroTracker
     ): string {
         if (level >= maxDepth) {
             return text;
@@ -439,7 +480,13 @@ export class MacroExpander {
         // Perform substitution
         let substituted = def.body;
         if (def.params && def.params.length > 0 && macro.args) {
-            substituted = MacroUtils.substituteParameters(substituted, def.params, macro.args);
+            substituted = MacroUtils.substituteParameters(
+                substituted,
+                def.params,
+                macro.args,
+                undefined,
+                event => this.recordConcatenatedMacro(event, concatenatedMacros)
+            );
         }
         
         // Replace in text
@@ -495,6 +542,52 @@ export class MacroExpander {
         });
         
         return allMacros[0];
+    }
+
+    private recordConcatenatedMacro(event: ConcatenationEvent, accumulator: ConcatenatedMacroTracker): void {
+        if (!event) {
+            return;
+        }
+
+        this.consumeConcatenatedToken(event.left, accumulator);
+        this.consumeConcatenatedToken(event.right, accumulator);
+
+        const token = event.combined;
+        if (!token) {
+            return;
+        }
+        if (!MacroExpander.MACRO_NAME_REGEX.test(token)) {
+            return;
+        }
+        if (BUILTIN_IDENTIFIERS.has(token)) {
+            return;
+        }
+
+        const current = accumulator.get(token) ?? 0;
+        accumulator.set(token, current + 1);
+    }
+
+    private consumeConcatenatedToken(token: string | undefined, accumulator: ConcatenatedMacroTracker): void {
+        if (!token) {
+            return;
+        }
+        if (!accumulator.has(token)) {
+            return;
+        }
+        const current = accumulator.get(token)!;
+        if (current <= 1) {
+            accumulator.delete(token);
+        } else {
+            accumulator.set(token, current - 1);
+        }
+    }
+
+    private getActiveConcatenatedMacros(accumulator: ConcatenatedMacroTracker): string[] | undefined {
+        if (accumulator.size === 0) {
+            return undefined;
+        }
+        const tokens = Array.from(accumulator.keys());
+        return tokens.length > 0 ? tokens : undefined;
     }
 
     /**

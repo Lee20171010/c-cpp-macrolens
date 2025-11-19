@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ Features
 
 - **Hover Definition Toggle**: Added `macrolens.hoverShowDefinition` setting to control whether MacroLens hover tooltips include the `#define` snippet, preventing duplicate content when C/C++ extension hovers are also enabled.
+- **Concatenated Macro Jump Links**: Macro expansion now tracks every identifier created via the `##` operator and shows them inside hover tooltips as clickable links. Each link uses the new `macrolens.openMacroFromHover` command so you can jump directly to the generated macro definition (with Quick Pick support when multiple definitions exist).
 
 ### 🐛 Bug Fixes
 

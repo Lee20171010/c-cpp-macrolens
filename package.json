@@ -152,6 +152,10 @@
       {
         "command": "macrolens.showStatistics",
         "title": "MacroLens: Show Performance Statistics"
+      },
+      {
+        "command": "macrolens.openMacroFromHover",
+        "title": "MacroLens: Open Macro Definition (Hover)"
       }
     ],
     "viewsContainers": {

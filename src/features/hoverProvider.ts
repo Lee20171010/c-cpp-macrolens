@@ -135,6 +135,14 @@ export class MacroHoverProvider implements vscode.HoverProvider {
         content.appendMarkdown('\n**Final Result:**\n');
         content.appendCodeblock(result.finalText, 'cpp');
 
+        if (result.concatenatedMacros && result.concatenatedMacros.length > 0) {
+            content.appendMarkdown('\n**Macros created via concatenation:**\n');
+            const linkLines = result.concatenatedMacros
+                .map(name => `- ${this.buildMacroCommandLink(name)}`)
+                .join('\n');
+            content.appendMarkdown(linkLines + '\n');
+        }
+
         // Provide suggestions for undefined macros in the expansion result
         if (result.undefinedMacros && result.undefinedMacros.size > 0) {
             this.refreshMacroCache();
@@ -285,6 +293,14 @@ export class MacroHoverProvider implements vscode.HoverProvider {
             .sort((a, b) => a.distance - b.distance)
             .slice(0, SUGGESTION_CONSTANTS.MAX_SUGGESTIONS)
             .map(r => r.candidate);
+    }
+
+    private buildMacroCommandLink(macroName: string): string {
+        const commandArgs = { macro: macroName };
+        const commandUri = vscode.Uri.parse(
+            `command:macrolens.openMacroFromHover?${encodeURIComponent(JSON.stringify(commandArgs))}`
+        );
+        return `[${macroName}](${commandUri})`;
     }
 
     /**

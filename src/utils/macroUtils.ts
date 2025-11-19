@@ -1,5 +1,11 @@
 import { REGEX_PATTERNS } from './constants';
 
+export interface ConcatenationEvent {
+    combined?: string;
+    left?: string;
+    right?: string;
+}
+
 /**
  * Shared utility functions for macro expansion and parameter handling
  */
@@ -224,10 +230,11 @@ export class MacroUtils {
      * @param expandArg Function to expand an argument (if needed)
      */
     static substituteParameters(
-        definition: string, 
-        params: string[], 
+        definition: string,
+        params: string[],
         args: string[],
-        expandArg?: (arg: string) => string
+        expandArg?: (arg: string) => string,
+        onTokenConcatenated?: (event: ConcatenationEvent) => void
     ): string {
         // Analyze which parameters should not be expanded
         const usage = this.analyzeParameterUsage(definition, params);
@@ -331,7 +338,7 @@ export class MacroUtils {
         }
         
         // Step 4: Process token concatenation (##)
-        result = this.processTokenConcatenation(result);
+        result = this.processTokenConcatenation(result, onTokenConcatenated);
         
         return result;
     }
@@ -353,34 +360,50 @@ export class MacroUtils {
      * - token ## → token (right side empty)
      * - ## → (both sides empty, placemarker)
      */
-    static processTokenConcatenation(text: string): string {
+    static processTokenConcatenation(
+        text: string,
+        onTokenConcatenated?: (event: ConcatenationEvent) => void
+    ): string {
         let result = text;
-        
+
         // Match ## with optional whitespace and tokens on both sides
         // Token can be: word, number, operator, etc.
         // Pattern: (token)? ## (token)?
         const concatenationRegex = new RegExp(
-            `([a-zA-Z_]\\w*|\\d+|[+\\-*\\/<>=!&|^%~]+)?\s*##\s*([a-zA-Z_]\\w*|\\d+|[+\\-*\\/<>=!&|^%~]+)?`, 
-            'g'
+            `([a-zA-Z_]\\w*|\\d+|[+\\-*\\/<>=!&|^%~]+)?\\s*##\\s*([a-zA-Z_]\\w*|\\d+|[+\\-*\\/<>=!&|^%~]+)?`
         );
-        
-        result = result.replace(concatenationRegex, (match, left, right) => {
-            // If both sides exist, concatenate
-            if (left && right) {
-                return left + right;
+
+        while (true) {
+            let replaced = false;
+            result = result.replace(concatenationRegex, (match, left, right) => {
+                replaced = true;
+                const leftToken = typeof left === 'string' ? left : undefined;
+                const rightToken = typeof right === 'string' ? right : undefined;
+                // If both sides exist, concatenate
+                if (leftToken && rightToken) {
+                    const combined = leftToken + rightToken;
+                    if (onTokenConcatenated) {
+                        onTokenConcatenated({ combined, left: leftToken, right: rightToken });
+                    }
+                    return combined;
+                }
+                // If only left exists
+                if (leftToken) {
+                    return leftToken;
+                }
+                // If only right exists
+                if (rightToken) {
+                    return rightToken;
+                }
+                // Both sides empty (placemarker)
+                return '';
+            });
+
+            if (!replaced) {
+                break;
             }
-            // If only left exists
-            if (left) {
-                return left;
-            }
-            // If only right exists
-            if (right) {
-                return right;
-            }
-            // Both sides empty (placemarker)
-            return '';
-        });
-        
+        }
+
         return result;
     }
 
