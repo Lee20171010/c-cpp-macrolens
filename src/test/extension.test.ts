@@ -34,4 +34,33 @@ suite('Extension Test Suite', () => {
 			(db as any).definitions = originalDefinitions;
 		}
 	});
+
+	test('should not expand macros inside string literals', () => {
+		const db = MacroDatabase.getInstance();
+		const expander = new MacroExpander();
+		const originalDefinitions = (db as any).definitions;
+		const customDefinitions = new Map();
+		customDefinitions.set('FOO', [{
+			name: 'FOO',
+			body: '123',
+			file: 'test.h',
+			line: 1,
+			isDefine: true
+		}]);
+		customDefinitions.set('WRAPPED', [{
+			name: 'WRAPPED',
+			body: '"FOO"',
+			file: 'test.h',
+			line: 2,
+			isDefine: true
+		}]);
+
+		try {
+			(db as any).definitions = customDefinitions;
+			const result = expander.expand('WRAPPED');
+			assert.strictEqual(result.finalText.trim(), '"FOO"');
+		} finally {
+			(db as any).definitions = originalDefinitions;
+		}
+	});
 });

@@ -100,7 +100,7 @@ export class MacroExpander {
         const undefined = new Set<string>();
         
         // Precompute string literal ranges so we can ignore uppercase tokens inside quotes
-        const stringLiteralRanges = this.extractStringLiteralRanges(text);
+        const stringLiteralRanges = MacroUtils.getStringLiteralRanges(text);
 
         // Match uppercase identifiers (potential macros)
         // Pattern: word starting with uppercase, containing at least one more uppercase or underscore
@@ -112,7 +112,7 @@ export class MacroExpander {
             const matchIndex = match.index ?? text.indexOf(name);
 
             // Ignore names that occur inside string literals
-            if (this.isIndexInRanges(matchIndex, stringLiteralRanges)) {
+            if (MacroUtils.isIndexWithinRanges(matchIndex, stringLiteralRanges)) {
                 continue;
             }
             
@@ -134,48 +134,6 @@ export class MacroExpander {
         }
         
         return undefined;
-    }
-
-    private extractStringLiteralRanges(text: string): Array<{ start: number; end: number }> {
-        const ranges: Array<{ start: number; end: number }> = [];
-        const DOUBLE_QUOTE = '"'.charCodeAt(0);
-        const SINGLE_QUOTE = "'".charCodeAt(0);
-        const BACKSLASH = '\\'.charCodeAt(0);
-        let inString = false;
-        let stringCharCode = 0;
-        let startIndex = 0;
-
-        for (let i = 0; i < text.length; i++) {
-            const charCode = text.charCodeAt(i);
-
-            if (!inString) {
-                if (charCode === DOUBLE_QUOTE || charCode === SINGLE_QUOTE) {
-                    inString = true;
-                    stringCharCode = charCode;
-                    startIndex = i;
-                }
-                continue;
-            }
-
-            if (
-                charCode === stringCharCode &&
-                (i === 0 || text.charCodeAt(i - 1) !== BACKSLASH)
-            ) {
-                ranges.push({ start: startIndex, end: i });
-                inString = false;
-            }
-        }
-
-        return ranges;
-    }
-
-    private isIndexInRanges(index: number, ranges: Array<{ start: number; end: number }>): boolean {
-        for (const range of ranges) {
-            if (index >= range.start && index <= range.end) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private expandRecursive(

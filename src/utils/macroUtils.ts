@@ -422,6 +422,8 @@ export class MacroUtils {
         depth?: number
     }> {
         const macros: Array<{name: string, args?: string[], start: number, end: number, depth?: number}> = [];
+        const literalRanges = this.getStringLiteralRanges(text);
+        const isInsideLiteral = (index: number) => this.isIndexWithinRanges(index, literalRanges);
         
         // Find macro names with arguments first
         let match;
@@ -430,6 +432,9 @@ export class MacroUtils {
         while ((match = REGEX_PATTERNS.MACRO_CALL_WITH_ARGS.exec(text)) !== null) {
             const macroName = match[1];
             const startIndex = match.index;
+            if (isInsideLiteral(startIndex)) {
+                continue;
+            }
             const parenIndex = match.index + match[0].length - 1; // Position of opening '('
             
             // Validate with database if provided
@@ -465,6 +470,9 @@ export class MacroUtils {
         while ((match = noArgsPattern.exec(text)) !== null) {
             const macroName = match[1];
             const startIndex = match.index;
+            if (isInsideLiteral(startIndex)) {
+                continue;
+            }
             const endIndex = match.index + match[0].length;
             
             // Validate with database if provided
@@ -489,6 +497,43 @@ export class MacroUtils {
         }
         
         return macros;
+    }
+
+    static getStringLiteralRanges(text: string): Array<{ start: number; end: number }> {
+        const ranges: Array<{ start: number; end: number }> = [];
+        let inString = false;
+        let stringChar = '';
+        let startIndex = 0;
+
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            const prevChar = i > 0 ? text[i - 1] : '';
+
+            if (!inString) {
+                if (char === '"' || char === "'") {
+                    inString = true;
+                    stringChar = char;
+                    startIndex = i;
+                }
+                continue;
+            }
+
+            if (char === stringChar && prevChar !== '\\') {
+                ranges.push({ start: startIndex, end: i });
+                inString = false;
+            }
+        }
+
+        return ranges;
+    }
+
+    static isIndexWithinRanges(index: number, ranges: Array<{ start: number; end: number }>): boolean {
+        for (const range of ranges) {
+            if (index >= range.start && index <= range.end) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

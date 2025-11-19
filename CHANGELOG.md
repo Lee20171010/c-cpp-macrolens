@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Hover Suggestion Guard**: Hover "Did you mean" suggestions now appear only for uppercase identifiers (macro-style names), preventing irrelevant recommendations for normal variables/functions.
 
 - **String Literal Macro Filtering**: Undefined-macro detection now skips uppercase tokens that appear inside string or character literals in expansion results, so text like `"ERROR"` no longer triggers false positives.
+- **String Literal Expansion Guard**: The macro expander itself now reuses the same literal detection logic, so uppercase tokens inside string/character literals are never expanded or suggested.
+- **Chained Concatenation Tracking**: Token concatenation handling now emits events for each `##` step, ensuring only the final concatenated tokens (e.g., `A##B##C → ABC`) show up in hover jump links.
 
 ## [0.1.4] - 2025-11-14
 
