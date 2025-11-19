@@ -81,13 +81,17 @@ export class MacroHoverProvider implements vscode.HoverProvider {
         const def = defs[0];
         
         // Check for unbalanced parentheses
+        const showDefinitionSnippet = this.config.getConfig().hoverShowDefinition;
+
         if (def.body.startsWith('/*UNBALANCED*/')) {
             const content = new vscode.MarkdownString();
             content.appendMarkdown('⚠️ **Unbalanced parentheses in macro definition**\n\n');
-            content.appendCodeblock(
-                `#define ${macroName}${def.params ? `(${def.params.join(', ')})` : ''} ${def.body.replace('/*UNBALANCED*/ ', '')}`,
-                'cpp'
-            );
+            if (showDefinitionSnippet) {
+                content.appendCodeblock(
+                    `#define ${macroName}${def.params ? `(${def.params.join(', ')})` : ''} ${def.body.replace('/*UNBALANCED*/ ', '')}`,
+                    'cpp'
+                );
+            }
             content.appendMarkdown('\nThis macro has mismatched parentheses and cannot be expanded.');
             content.isTrusted = true;
             return new vscode.Hover(content, wordRange);
@@ -101,10 +105,12 @@ export class MacroHoverProvider implements vscode.HoverProvider {
             `${macroName}(${args.join(', ')})` : 
             macroName;
         
-        content.appendCodeblock(
-            `#define ${macroName}${def.params ? `(${def.params.join(', ')})` : ''} ${def.body}`,
-            'cpp'
-        );
+        if (showDefinitionSnippet) {
+            content.appendCodeblock(
+                `#define ${macroName}${def.params ? `(${def.params.join(', ')})` : ''} ${def.body}`,
+                'cpp'
+            );
+        }
 
         // Check if expansion encountered errors (e.g., unbalanced parentheses in nested macros)
         if (result.hasErrors && result.errorMessage) {

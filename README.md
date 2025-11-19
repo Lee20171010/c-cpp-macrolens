@@ -101,6 +101,7 @@ Access via VS Code Settings (Ctrl+, / Cmd+,) and search for "MacroLens":
 | \`macrolens.enableTreeView\` | boolean | \`true\` | Show/hide macro expansion tree view |
 | \`macrolens.enableHoverProvider\` | boolean | \`true\` | Enable/disable hover tooltips |
 | \`macrolens.enableDiagnostics\` | boolean | \`true\` | Enable/disable diagnostics |
+| \`macrolens.hoverShowDefinition\` | boolean | \`true\` | Show the \`#define\` snippet in MacroLens hover tooltips |
 | \`macrolens.expansionMode\` | string | \`"single-layer"\` | Expansion strategy (\`single-macro\` or \`single-layer\`) |
 | \`macrolens.debounceDelay\` | number | \`500\` | Debounce delay for file changes (100-2000ms) |
 | \`macrolens.maxUpdateDelay\` | number | \`8000\` | Maximum delay before forced update (2-30s) |

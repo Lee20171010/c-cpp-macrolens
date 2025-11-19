@@ -94,6 +94,11 @@
           "default": true,
           "description": "Enable diagnostics for undefined macros and errors"
         },
+        "macrolens.hoverShowDefinition": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the #define line inside MacroLens hover tooltips"
+        },
         "macrolens.expansionMode": {
           "type": "string",
           "enum": [

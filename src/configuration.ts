@@ -5,6 +5,7 @@ export interface MacroLensConfig {
     enableTreeView: boolean;
     enableHoverProvider: boolean;
     enableDiagnostics: boolean;
+    hoverShowDefinition: boolean;
     expansionMode: 'single-macro' | 'single-layer';
     debounceDelay: number;
     maxUpdateDelay: number;
@@ -29,6 +30,7 @@ export class Configuration {
             enableTreeView: config.get('enableTreeView', true),
             enableHoverProvider: config.get('enableHoverProvider', true),
             enableDiagnostics: config.get('enableDiagnostics', true),
+            hoverShowDefinition: config.get('hoverShowDefinition', true),
             expansionMode: config.get('expansionMode', 'single-layer'),
             debounceDelay: config.get('debounceDelay', 500),
             maxUpdateDelay: config.get('maxUpdateDelay', 8000),

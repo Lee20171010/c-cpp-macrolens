@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Features
+
+- **Hover Definition Toggle**: Added `macrolens.hoverShowDefinition` setting to control whether MacroLens hover tooltips include the `#define` snippet, preventing duplicate content when C/C++ extension hovers are also enabled.
+
 ## [0.1.4] - 2025-11-14
 
 ### ✨ Features
