@@ -350,14 +350,7 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
                 `**Definitions Map**: ${stats.memoryUsage.definitionsMapSize} unique macros, ${stats.memoryUsage.totalDefinitions} total definitions (${formatBytes(stats.memoryUsage.definitionsMapBytes)})`,
             ];
             
-            // Add hover provider cache statistics if enabled
-            if (hoverProvider) {
-                const hoverMemory = hoverProvider.getMemoryUsage();
-                memoryLines.push(
-                    `**Distance Cache**: ${hoverMemory.distanceCacheSize} entries (${formatBytes(hoverMemory.distanceCacheBytes)})`,
-                    `**Macro Names Cache**: ${formatBytes(hoverMemory.allMacrosCacheBytes)}`
-                );
-            }
+
             
             const message = [
                 '## MacroLens Performance Statistics',
@@ -424,7 +417,6 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
                     hoverProviderDisposables.forEach(disposable => disposable.dispose());
                     hoverProviderDisposables = [];
                     if (hoverProvider) {
-                        hoverProvider.dispose();
                         hoverProvider = null;
                     }
                     vscode.window.showInformationMessage('MacroLens: Hover provider disabled');
@@ -517,7 +509,7 @@ async function revealMacroDefinition(def: MacroDef): Promise<void> {
 export function deactivate() {
     try {
         if (hoverProvider) {
-            hoverProvider.dispose();
+            // hoverProvider.dispose();
         }
         if (diagnostics) {
             diagnostics.dispose();

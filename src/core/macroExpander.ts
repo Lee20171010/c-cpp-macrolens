@@ -322,22 +322,36 @@ export class MacroExpander {
             }
             
             // Check parameter matching
-            if (def.params && def.params.length > 0) {
-                // Handle variadic macros (params ending with ...)
-                const isVariadic = def.params.some(p => p.includes('...'));
-                if (isVariadic) {
-                    // For variadic macros, we need at least as many args as non-variadic params
-                    const minParams = def.params.filter(p => !p.includes('...')).length;
-                    if (!macro.args || macro.args.length < minParams) {
-                        continue;
+            if (def.params) {
+                // Function-like macro
+                if (!macro.args) {
+                    continue; // Invoked without arguments
+                }
+
+                if (def.params.length > 0) {
+                    // Handle variadic macros (params ending with ...)
+                    const isVariadic = def.params.some(p => p.includes('...'));
+                    if (isVariadic) {
+                        // For variadic macros, we need at least as many args as non-variadic params
+                        const minParams = def.params.filter(p => !p.includes('...')).length;
+                        if (macro.args.length < minParams) {
+                            continue;
+                        }
+                    } else {
+                        // Regular macro - exact parameter count match
+                        if (macro.args.length !== def.params.length) {
+                            continue;
+                        }
                     }
                 } else {
-                    // Regular macro - exact parameter count match
-                    if (!macro.args || macro.args.length !== def.params.length) {
+                    // Function-like macro with 0 parameters (e.g. #define AB() 10)
+                    // Must be invoked with empty arguments list
+                    if (macro.args.length !== 0) {
                         continue;
                     }
                 }
             } else if (macro.args) {
+                // Object-like macro invoked as function
                 continue;
             }
             
@@ -416,22 +430,36 @@ export class MacroExpander {
         }
         
         // Check parameter matching
-        if (def.params && def.params.length > 0) {
-            // Handle variadic macros (params ending with ...)
-            const isVariadic = def.params.some(p => p.includes('...'));
-            if (isVariadic) {
-                // For variadic macros, we need at least as many args as non-variadic params
-                const minParams = def.params.filter(p => !p.includes('...')).length;
-                if (!macro.args || macro.args.length < minParams) {
-                    return text;
+        if (def.params) {
+            // Function-like macro
+            if (!macro.args) {
+                return text; // Invoked without arguments
+            }
+
+            if (def.params.length > 0) {
+                // Handle variadic macros (params ending with ...)
+                const isVariadic = def.params.some(p => p.includes('...'));
+                if (isVariadic) {
+                    // For variadic macros, we need at least as many args as non-variadic params
+                    const minParams = def.params.filter(p => !p.includes('...')).length;
+                    if (macro.args.length < minParams) {
+                        return text;
+                    }
+                } else {
+                    // Regular macro - exact parameter count match
+                    if (macro.args.length !== def.params.length) {
+                        return text;
+                    }
                 }
             } else {
-                // Regular macro - exact parameter count match
-                if (!macro.args || macro.args.length !== def.params.length) {
+                // Function-like macro with 0 parameters (e.g. #define AB() 10)
+                // Must be invoked with empty arguments list
+                if (macro.args.length !== 0) {
                     return text;
                 }
             }
         } else if (macro.args) {
+            // Object-like macro invoked as function
             return text;
         }
         
@@ -587,12 +615,14 @@ export class MacroExpander {
                 
                 return true;
             })
-            .map(macro => ({
-                name: macro.name,
-                args: macro.args,
-                startIndex: macro.start,
-                endIndex: macro.end,
-                depth: macro.depth!
-            }));
+            .map(macro => {
+                return {
+                    name: macro.name,
+                    args: macro.args,
+                    startIndex: macro.start,
+                    endIndex: macro.end,
+                    depth: macro.depth!
+                };
+            });
     }
 }
