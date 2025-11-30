@@ -185,21 +185,62 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
 
     // Register document event handlers
     context.subscriptions.push(
-        vscode.workspace.onDidOpenTextDocument(async doc => {
-            if (diagnostics && doc.languageId === 'c' || doc.languageId === 'cpp') {
-                await diagnostics.analyze(doc);
-            }
-        }),
+        // Only analyze the active document when it changes
         vscode.workspace.onDidChangeTextDocument(async e => {
-            if (diagnostics && e.document.languageId === 'c' || e.document.languageId === 'cpp') {
-                await diagnostics.analyze(e.document);
+            if (!diagnostics) { return; }
+            
+            const focusOnly = config.getConfig().diagnosticsFocusOnly;
+            
+            if (focusOnly) {
+                // Only analyze if it's the active document
+                if (vscode.window.activeTextEditor && 
+                    e.document === vscode.window.activeTextEditor.document &&
+                    (e.document.languageId === 'c' || e.document.languageId === 'cpp')) {
+                    await diagnostics.analyze(e.document);
+                }
+            } else {
+                // Analyze any changed C/C++ document
+                if (e.document.languageId === 'c' || e.document.languageId === 'cpp') {
+                    await diagnostics.analyze(e.document);
+                }
             }
         }),
+        
+        // Analyze when switching to a new editor
+        vscode.window.onDidChangeActiveTextEditor(async editor => {
+            if (!diagnostics || !editor) { return; }
+            
+            if (editor.document.languageId === 'c' || editor.document.languageId === 'cpp') {
+                await diagnostics.analyze(editor.document);
+                
+                // If focus only mode is enabled, clear diagnostics for other documents
+                if (config.getConfig().diagnosticsFocusOnly) {
+                    vscode.workspace.textDocuments.forEach(doc => {
+                        if (doc !== editor.document && (doc.languageId === 'c' || doc.languageId === 'cpp')) {
+                            diagnostics.clearDiagnostics(doc);
+                        }
+                    });
+                }
+            }
+        }),
+
         vscode.workspace.onDidSaveTextDocument(async doc => {
             if (doc.languageId === 'c' || doc.languageId === 'cpp') {
                 // Use incremental scan instead of full project scan
                 macroDb.queueFileForScan(doc.uri);
-                if (diagnostics) {
+                
+                if (!diagnostics) { return; }
+                
+                const focusOnly = config.getConfig().diagnosticsFocusOnly;
+                
+                if (focusOnly) {
+                    // Only re-analyze if it's the active document
+                    if (vscode.window.activeTextEditor && 
+                        doc === vscode.window.activeTextEditor.document) {
+                        await diagnostics.analyze(doc);
+                    }
+                } else {
+                    // Always re-analyze on save
                     await diagnostics.analyze(doc);
                 }
             }
@@ -212,12 +253,25 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
         })
     );
 
-    // Analyze all currently open C/C++ documents
+    // Initial analysis
     if (diagnostics) {
-        const analyzePromises = vscode.workspace.textDocuments
-            .filter(doc => doc.languageId === 'c' || doc.languageId === 'cpp')
-            .map(doc => diagnostics.analyze(doc));
-        await Promise.all(analyzePromises);
+        const focusOnly = config.getConfig().diagnosticsFocusOnly;
+        
+        if (focusOnly) {
+            // Analyze only the currently active C/C++ document
+            if (vscode.window.activeTextEditor) {
+                const doc = vscode.window.activeTextEditor.document;
+                if (doc.languageId === 'c' || doc.languageId === 'cpp') {
+                    await diagnostics.analyze(doc);
+                }
+            }
+        } else {
+            // Analyze all currently open C/C++ documents
+            const analyzePromises = vscode.workspace.textDocuments
+                .filter(doc => doc.languageId === 'c' || doc.languageId === 'cpp')
+                .map(doc => diagnostics.analyze(doc));
+            await Promise.all(analyzePromises);
+        }
     }
 
     // Register all commands
@@ -350,14 +404,7 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
                 `**Definitions Map**: ${stats.memoryUsage.definitionsMapSize} unique macros, ${stats.memoryUsage.totalDefinitions} total definitions (${formatBytes(stats.memoryUsage.definitionsMapBytes)})`,
             ];
             
-            // Add hover provider cache statistics if enabled
-            if (hoverProvider) {
-                const hoverMemory = hoverProvider.getMemoryUsage();
-                memoryLines.push(
-                    `**Distance Cache**: ${hoverMemory.distanceCacheSize} entries (${formatBytes(hoverMemory.distanceCacheBytes)})`,
-                    `**Macro Names Cache**: ${formatBytes(hoverMemory.allMacrosCacheBytes)}`
-                );
-            }
+
             
             const message = [
                 '## MacroLens Performance Statistics',
@@ -424,7 +471,6 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
                     hoverProviderDisposables.forEach(disposable => disposable.dispose());
                     hoverProviderDisposables = [];
                     if (hoverProvider) {
-                        hoverProvider.dispose();
                         hoverProvider = null;
                     }
                     vscode.window.showInformationMessage('MacroLens: Hover provider disabled');
@@ -517,7 +563,7 @@ async function revealMacroDefinition(def: MacroDef): Promise<void> {
 export function deactivate() {
     try {
         if (hoverProvider) {
-            hoverProvider.dispose();
+            // hoverProvider.dispose();
         }
         if (diagnostics) {
             diagnostics.dispose();

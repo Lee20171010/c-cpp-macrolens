@@ -486,21 +486,20 @@ npm run test:coverage
 
 ```typescript
 /**
- * Calculates Levenshtein distance between two strings.
+ * Finds similar symbols in the workspace using VS Code's native provider.
  * 
  * Used for suggesting similar macro names when undefined macro detected.
  * 
- * @param str1 - First string to compare
- * @param str2 - Second string to compare
- * @returns Edit distance (0 = identical, higher = more different)
+ * @param name - The name of the symbol to search for
+ * @returns A list of similar symbol names found in the workspace
  * 
  * @example
  * ```typescript
- * levenshteinDistance('kitten', 'sitting');  // Returns: 3
- * levenshteinDistance('foo', 'foo');         // Returns: 0
+ * const suggestions = await findSimilarSymbols('MY_MACRO');
+ * // Returns: ['MY_MACRO_1', 'MY_MACRO_2']
  * ```
  */
-function levenshteinDistance(str1: string, str2: string): number {
+async function findSimilarSymbols(name: string): Promise<string[]> {
   // Implementation
 }
 ```

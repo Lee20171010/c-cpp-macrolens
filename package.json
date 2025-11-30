@@ -94,6 +94,11 @@
           "default": true,
           "description": "Enable diagnostics for undefined macros and errors"
         },
+        "macrolens.diagnosticsFocusOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "Only analyze and report diagnostics for the currently focused editor. If disabled, all open C/C++ files will be analyzed."
+        },
         "macrolens.hoverShowDefinition": {
           "type": "boolean",
           "default": true,

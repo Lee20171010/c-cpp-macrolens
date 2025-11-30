@@ -10,6 +10,7 @@ export interface MacroLensConfig {
     debounceDelay: number;
     maxUpdateDelay: number;
     maxExpansionDepth: number;
+    diagnosticsFocusOnly: boolean;
 }
 
 export class Configuration {
@@ -34,7 +35,8 @@ export class Configuration {
             expansionMode: config.get('expansionMode', 'single-layer'),
             debounceDelay: config.get('debounceDelay', 500),
             maxUpdateDelay: config.get('maxUpdateDelay', 8000),
-            maxExpansionDepth: config.get('maxExpansionDepth', 30)
+            maxExpansionDepth: config.get('maxExpansionDepth', 30),
+            diagnosticsFocusOnly: config.get('diagnosticsFocusOnly', true)
         };
     }
 

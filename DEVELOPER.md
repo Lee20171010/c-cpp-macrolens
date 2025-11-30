@@ -281,7 +281,8 @@ CALC(3) → DOUBLE(SQUARE(3))
   debounceDelay: number,              // 100-2000ms
   maxUpdateDelay: number,             // 2000-30000ms
   detectTypeDeclarations: boolean,    // typedef/struct filtering
-  maxExpansionDepth: number          // 5-100
+  maxExpansionDepth: number,          // 5-100
+  diagnosticsFocusOnly: boolean       // Only analyze active editor
 }
 ```
 

@@ -518,10 +518,18 @@ export class MacroParser {
             // Example:
             //   enum E { TST1 = 0, TST2, TST3 };
             //   enum { CONST1, CONST2 };  (anonymous enum)
+            //   enum
+            //   {
+            //       TST1,
+            //       TST2
+            //   };
             const enumMatch = line.match(enumRegex);
             const isAnonymousEnum = anonymousEnumRegex.test(line);
             
-            if (enumMatch || isAnonymousEnum) {
+            // Check for split anonymous enum (enum on one line, { on next)
+            const isSplitAnonymousEnum = !enumMatch && !isAnonymousEnum && line.trim() === 'enum';
+            
+            if (enumMatch || isAnonymousEnum || isSplitAnonymousEnum) {
                 let enumName: string | undefined;
                 
                 if (enumMatch) {
@@ -554,7 +562,7 @@ export class MacroParser {
                 if (braceStart !== -1 && braceEnd !== -1) {
                     const enumBody = fullEnum.substring(braceStart + 1, braceEnd);
                     
-                    // Split by comma and extract uppercase identifiers
+                    // Split by comma and extract identifiers
                     const enumConstants = enumBody.split(',');
                     
                     for (const constant of enumConstants) {
@@ -563,8 +571,8 @@ export class MacroParser {
                         const namepart = eqIndex !== -1 ? constant.substring(0, eqIndex) : constant;
                         const trimmedName = namepart.trim();
                         
-                        // Check if it's an uppercase identifier
-                        if (/^[A-Z_][A-Z0-9_]*$/.test(trimmedName)) {
+                        // Check if it's a valid identifier (allow mixed case)
+                        if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmedName)) {
                             defs.push({
                                 name: trimmedName,
                                 params: undefined,

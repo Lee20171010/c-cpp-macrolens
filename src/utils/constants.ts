@@ -7,17 +7,8 @@
  * Macro suggestion constants (used in hover provider)
  */
 export const SUGGESTION_CONSTANTS = {
-    /** Maximum Levenshtein distance for macro name suggestions */
-    MAX_SUGGESTION_DISTANCE: 2,
-    
-    /** Minimum macro name length for substring matching */
-    MIN_SUBSTRING_LENGTH: 4,
-    
     /** Maximum number of macro suggestions to show */
     MAX_SUGGESTIONS: 3,
-    
-    /** Maximum cache size before clearing (for Levenshtein distance cache) */
-    MAX_CACHE_SIZE: 1000,
 } as const;
 
 /**
@@ -94,14 +85,14 @@ export const REGEX_PATTERNS = {
     /** Matches typedef declaration */
     TYPEDEF_DIRECTIVE: /^\s*typedef\s+/,
     
-    /** Matches struct declaration with uppercase name */
-    STRUCT_DECLARATION: /^\s*struct\s+([A-Z_][A-Z0-9_]*)/,
+    /** Matches struct declaration */
+    STRUCT_DECLARATION: /^\s*struct\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
     
-    /** Matches union declaration with uppercase name */
-    UNION_DECLARATION: /^\s*union\s+([A-Z_][A-Z0-9_]*)/,
+    /** Matches union declaration */
+    UNION_DECLARATION: /^\s*union\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
     
-    /** Matches enum declaration with uppercase name */
-    ENUM_DECLARATION: /^\s*enum\s+([A-Z_][A-Z0-9_]*)/,
+    /** Matches enum declaration (including C++ enum class) */
+    ENUM_DECLARATION: /^\s*enum\s+(?:class\s+|struct\s+)?([a-zA-Z_][a-zA-Z0-9_]*)/,
     
     /** Matches anonymous enum declaration */
     ANONYMOUS_ENUM_DECLARATION: /^\s*enum\s*\{/,

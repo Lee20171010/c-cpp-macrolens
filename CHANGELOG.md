@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Features
+
+- **Focus-Only Diagnostics**: Added `macrolens.diagnosticsFocusOnly` setting (default: `true`). When enabled, diagnostics are only reported for the currently active editor, reducing noise and improving performance in large projects.
+- **Enhanced Type Detection**: Improved parser to support mixed-case and C++ style type declarations:
+  - Support for mixed-case `enum`, `struct`, and `union` names (e.g., `enum Color`).
+  - Support for C++ `enum class` declarations.
+  - Support for split anonymous enums (where `enum` and `{` are on different lines).
+  - Improved detection of variable declarations to prevent false "undefined macro" warnings for uppercase variable names.
+- **Native Symbol Suggestions**: Replaced the internal Levenshtein distance algorithm with VS Code's native `executeWorkspaceSymbolProvider` for "Did you mean..." suggestions. This improves accuracy, reduces memory usage (no more large macro name caches), and leverages the C/C++ extension's existing index.
+
+### 🐛 Bug Fixes
+
+- **Member Access False Positives**: Fixed issue where uppercase member access (e.g., `obj.MEMBER` or `ptr->MEMBER`) was incorrectly flagged as an undefined macro.
+- **Variable Declaration False Positives**: Fixed issue where uppercase variable names in declarations (e.g., `int VAL;`) were incorrectly flagged as undefined macros.
+- **Enum Constant Detection**: Fixed issue where enum constants in mixed-case enums were not detected, leading to false undefined macro warnings.
+
 ## [0.1.5] - 2025-11-19
 
 ### ✨ Features

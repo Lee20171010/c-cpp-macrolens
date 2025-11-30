@@ -27,12 +27,13 @@ Hover over any macro to see:
 - **Toggle visibility** via settings
 
 ### 🔴 Smart Diagnostics
-- **Undefined macro detection** with intelligent suggestions using Levenshtein distance
+- **Undefined macro detection** with intelligent suggestions using VS Code's native symbol provider
 - **Argument count validation** for function-like macros (including variadic `__VA_ARGS__`)
 - **Multiple definition warnings** with quick picker to navigate
 - **Type declaration recognition** (typedef, struct, enum, union) to prevent false positives
 - **Expansion result validation** - warns if expanded code contains undefined macros
 - **Source attribution** - all diagnostics clearly marked with "MacroLens"
+- **Focus Mode** - Optional setting (`macrolens.diagnosticsFocusOnly`) to limit diagnostics to the active editor only, reducing noise in large projects.
 
 ### 💾 Smart Storage
 - **Global storage** - no project directory pollution
@@ -254,7 +255,7 @@ MacroLens Extension
 ├── Features
 │   ├── HoverProvider (Interactive tooltips)
 │   ├── DiagnosticsProvider (Error detection)
-│   │   ├── Levenshtein distance suggestions
+│   │   ├── Native Symbol Suggestions
 │   │   ├── Argument count validation
 │   │   └── Expansion result validation
 │   └── TreeProvider (Visual hierarchy)

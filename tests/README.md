@@ -76,7 +76,7 @@ tests/
 - ✅ Multi-line type declarations
 - ✅ Undefined macro detection
 - ✅ Expansion result validation
-- ✅ Similarity suggestions (Levenshtein distance)
+- ✅ Similarity suggestions (Native Workspace Symbols)
 - ✅ Preprocessor directive filtering
 - ✅ Parameter vs. identifier differentiation
 

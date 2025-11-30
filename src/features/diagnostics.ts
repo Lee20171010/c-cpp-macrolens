@@ -219,6 +219,16 @@ export class MacroDiagnostics {
                 continue;
             }
 
+            // Skip struct/union member access (e.g. obj.MEMBER or ptr->MEMBER)
+            if (this.isMemberAccess(cleanText, callStartIndex)) {
+                continue;
+            }
+
+            // Skip if it looks like a variable declaration (e.g. int VAL;)
+            if (this.isDeclaration(cleanText, callStartIndex)) {
+                continue;
+            }
+
             // Get macro definition
             const defs = this.db.getDefinitions(macroName);
             
@@ -733,5 +743,92 @@ export class MacroDiagnostics {
             this.debounceTimer = null;
         }
         this.diagnosticCollection.dispose();
+    }
+
+    /**
+     * Check if the token at the given index is a member access (preceded by . or ->)
+     */
+    private isMemberAccess(text: string, index: number): boolean {
+        // Look backwards from index, skipping whitespace
+        let i = index - 1;
+        while (i >= 0 && /\s/.test(text[i])) {
+            i--;
+        }
+        
+        if (i < 0) {
+            return false;
+        }
+        
+        // Check for .
+        if (text[i] === '.') {
+            return true;
+        }
+        
+        // Check for ->
+        if (text[i] === '>' && i > 0 && text[i-1] === '-') {
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Check if the token at the given index looks like a variable declaration
+     * Checks if the preceding token is a type keyword or identifier
+     */
+    private isDeclaration(text: string, index: number): boolean {
+        // Look backwards from index, skipping whitespace and pointers
+        let i = index - 1;
+        
+        // Skip whitespace
+        while (i >= 0 && /\s/.test(text[i])) {
+            i--;
+        }
+        
+        // Skip pointers (*), references (&), and whitespace around them
+        while (i >= 0 && (text[i] === '*' || text[i] === '&' || /\s/.test(text[i]))) {
+            i--;
+        }
+        
+        if (i < 0) {
+            return false;
+        }
+        
+        // Now we should be at the end of the type name
+        // Read backwards to get the word
+        let end = i + 1;
+        while (i >= 0 && /[a-zA-Z0-9_]/.test(text[i])) {
+            i--;
+        }
+        
+        const word = text.substring(i + 1, end);
+        
+        // Common C/C++ types
+        const types = new Set([
+            'int', 'char', 'short', 'long', 'float', 'double', 'void',
+            'unsigned', 'signed', 'bool', '_Bool', 'size_t', 'int8_t',
+            'uint8_t', 'int16_t', 'uint16_t', 'int32_t', 'uint32_t',
+            'int64_t', 'uint64_t', 'struct', 'union', 'enum', 'class',
+            'auto', 'const', 'volatile', 'register', 'static', 'extern'
+        ]);
+        
+        if (types.has(word)) {
+            return true;
+        }
+
+        // Check database for known types (typedefs, structs, enums)
+        // This handles project-specific types that don't follow naming conventions
+        const defs = this.db.getDefinitions(word);
+        if (defs.length > 0 && defs[0].isDefine === false) {
+            return true;
+        }
+        
+        // Also check if it looks like a type (e.g. MyType_t)
+        // This is a heuristic: if it ends with _t or starts with uppercase (and we are not at start of line)
+        if (word.endsWith('_t') || /^[A-Z]/.test(word)) {
+            return true;
+        }
+        
+        return false;
     }
 }

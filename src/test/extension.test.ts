@@ -63,4 +63,36 @@ suite('Extension Test Suite', () => {
 			(db as any).definitions = originalDefinitions;
 		}
 	});
+
+	test('should expand function-like macro with empty arguments', () => {
+		const db = MacroDatabase.getInstance();
+		const expander = new MacroExpander();
+		const originalDefinitions = (db as any).definitions;
+		const customDefinitions = new Map();
+
+		customDefinitions.set('AB', [{
+			name: 'AB',
+			params: [], // Empty parameter list
+			body: '10',
+			file: 'test.h',
+			line: 1,
+			isDefine: true
+		}]);
+
+		customDefinitions.set('TST', [{
+			name: 'TST',
+			body: 'AB()',
+			file: 'test.h',
+			line: 2,
+			isDefine: true
+		}]);
+
+		try {
+			(db as any).definitions = customDefinitions;
+			const result = expander.expand('TST');
+			assert.strictEqual(result.finalText.trim(), '10');
+		} finally {
+			(db as any).definitions = originalDefinitions;
+		}
+	});
 });
