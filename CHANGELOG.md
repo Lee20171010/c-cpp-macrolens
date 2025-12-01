@@ -5,10 +5,14 @@ All notable changes to the "C/C++ MacroLens" extension will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.6] - 2025-12-02
 
 ### ✨ Features
 
+- **LSP Timeout Protection**: Added a 2-second timeout to workspace symbol searches (used for "Did you mean..." suggestions). This prevents the extension from hanging or freezing if the C/C++ extension (IntelliSense) is busy or unresponsive.
+- **Clean Database Rebuild**: The "Full Rescan" command now physically deletes and recreates the SQLite database file. This ensures a completely clean state, fixes potential schema mismatches, and recovers disk space from deleted files.
+- **Event-Driven Architecture**: Refactored the core architecture to use an event-driven model. The database now emits events when updates occur, decoupling data processing from UI refreshes and improving overall responsiveness.
+- **Optimized Diagnostics**: Implemented batch processing for diagnostics. Rapid file changes are now queued and processed in a single batch, preventing "starvation" where some files might be skipped during heavy I/O.
 - **Focus-Only Diagnostics**: Added `macrolens.diagnosticsFocusOnly` setting (default: `true`). When enabled, diagnostics are only reported for the currently active editor, reducing noise and improving performance in large projects.
 - **Enhanced Type Detection**: Improved parser to support mixed-case and C++ style type declarations:
   - Support for mixed-case `enum`, `struct`, and `union` names (e.g., `enum Color`).
@@ -19,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🐛 Bug Fixes
 
+- **Language ID Safety**: Replaced loose regex matching for language IDs with strict equality checks. This prevents potential false positives (e.g., `css` or `csharp` files being treated as C/C++).
+- **Resource Cleanup**: Fixed a memory leak where diagnostic timers were not properly disposed of when the extension was deactivated.
 - **Member Access False Positives**: Fixed issue where uppercase member access (e.g., `obj.MEMBER` or `ptr->MEMBER`) was incorrectly flagged as an undefined macro.
 - **Variable Declaration False Positives**: Fixed issue where uppercase variable names in declarations (e.g., `int VAL;`) were incorrectly flagged as undefined macros.
 - **Enum Constant Detection**: Fixed issue where enum constants in mixed-case enums were not detected, leading to false undefined macro warnings.

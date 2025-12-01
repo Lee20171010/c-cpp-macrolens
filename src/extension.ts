@@ -79,7 +79,8 @@ function registerBasicCommands(context: vscode.ExtensionContext): void {
             
             try {
                 macroDb.initialize(context);
-                await macroDb.scanProject();
+                // Force rebuild on manual rescan
+                await macroDb.scanProject(true);
                 vscode.window.showInformationMessage('MacroLens: Project rescan completed successfully');
             } catch (error) {
                 const errorMsg = error instanceof Error ? error.message : String(error);
@@ -224,27 +225,34 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
             }
         }),
 
-        vscode.workspace.onDidSaveTextDocument(async doc => {
-            if (doc.languageId === 'c' || doc.languageId === 'cpp') {
-                // Use incremental scan instead of full project scan
-                macroDb.queueFileForScan(doc.uri);
-                
-                if (!diagnostics) { return; }
-                
-                const focusOnly = config.getConfig().diagnosticsFocusOnly;
-                
-                if (focusOnly) {
-                    // Only re-analyze if it's the active document
-                    if (vscode.window.activeTextEditor && 
-                        doc === vscode.window.activeTextEditor.document) {
+        // Listen for database updates to refresh diagnostics
+        macroDb.onDidChange(async (uri) => {
+            if (!diagnostics) { return; }
+            
+            // When DB updates, we should re-analyze open documents because
+            // macros they use might have changed (e.g. in a header file)
+            
+            const focusOnly = config.getConfig().diagnosticsFocusOnly;
+            
+            if (focusOnly) {
+                // Only re-analyze if it's the active document
+                if (vscode.window.activeTextEditor) {
+                    const doc = vscode.window.activeTextEditor.document;
+                    if (doc.languageId === 'c' || doc.languageId === 'cpp') {
                         await diagnostics.analyze(doc);
                     }
-                } else {
-                    // Always re-analyze on save
-                    await diagnostics.analyze(doc);
                 }
+            } else {
+                // Re-analyze all open C/C++ documents
+                // This is important if a header file changed
+                vscode.workspace.textDocuments.forEach(doc => {
+                    if (doc.languageId === 'c' || doc.languageId === 'cpp') {
+                        diagnostics.analyze(doc);
+                    }
+                });
             }
         }),
+
         vscode.workspace.onDidCloseTextDocument(doc => {
             if (diagnostics && doc.languageId === 'c' || doc.languageId === 'cpp') {
                 // Clear diagnostics when file is closed
@@ -294,7 +302,8 @@ async function initializeMacroLens(context: vscode.ExtensionContext): Promise<vo
                 let resultMessage: string;
                 
                 if (choice.label === 'Full Rescan') {
-                    await macroDb.scanProject();
+                    // Force rebuild database on full rescan to ensure clean state
+                    await macroDb.scanProject(true);
                     
                     // Get detailed results for full rescan
                     const allMacros = macroDb.getAllDefinitions();

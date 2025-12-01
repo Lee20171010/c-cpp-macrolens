@@ -38,10 +38,13 @@ Hover over any macro to see:
 ### 💾 Smart Storage
 - **Global storage** - no project directory pollution
 - **Per-workspace isolation** - each project gets its own database
+- **Clean Rebuild** - "Full Rescan" physically recreates the database to ensure zero fragmentation
 - **Automatic fallback** - uses in-memory storage if SQLite unavailable
 - **Efficient caching** - minimizes redundant parsing
 
 ### ⚡ Performance Optimized
+- **Event-Driven Architecture** - decoupled updates for maximum responsiveness
+- **LSP Safety** - 2s timeout on symbol searches prevents UI freezes
 - **Incremental scanning** - only processes changed files
 - **Intelligent debouncing** - responsive updates without excessive CPU usage
   - 500ms default delay (configurable 100-2000ms)

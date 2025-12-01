@@ -4,6 +4,7 @@ import { MacroParser } from '../core/macroParser';
 import { MacroUtils } from '../utils/macroUtils';
 import { MacroExpander } from '../core/macroExpander';
 import { REGEX_PATTERNS, BUILTIN_IDENTIFIERS } from '../utils/constants';
+import { Configuration } from '../configuration';
 
 export class MacroDiagnostics {
     private diagnosticCollection: vscode.DiagnosticCollection;
@@ -12,6 +13,7 @@ export class MacroDiagnostics {
     // Debounce timer to avoid frequent diagnostics
     private debounceTimer: NodeJS.Timeout | null = null;
     private readonly DEBOUNCE_DELAY = 500; // 500ms debounce
+    private pendingDocs: Set<vscode.TextDocument> = new Set();
 
     constructor() {
         this.diagnosticCollection = vscode.languages.createDiagnosticCollection('macrolens');
@@ -20,14 +22,37 @@ export class MacroDiagnostics {
     }
 
     async analyze(document: vscode.TextDocument): Promise<void> {
+        // Add to pending set
+        this.pendingDocs.add(document);
+
         // Debounce diagnostics to avoid frequent updates
         if (this.debounceTimer) {
             clearTimeout(this.debounceTimer);
         }
         
         this.debounceTimer = setTimeout(async () => {
-            await this.analyzeImmediate(document);
+            await this.processPendingDocs();
         }, this.DEBOUNCE_DELAY);
+    }
+
+    private async processPendingDocs(): Promise<void> {
+        const docs = Array.from(this.pendingDocs);
+        this.pendingDocs.clear();
+        this.debounceTimer = null;
+
+        const config = Configuration.getInstance().getConfig();
+        const activeDoc = vscode.window.activeTextEditor?.document;
+
+        for (const doc of docs) {
+            if (doc.isClosed) { continue; }
+            
+            // If focus only mode is enabled, skip documents that are not active
+            if (config.diagnosticsFocusOnly && doc !== activeDoc) {
+                continue;
+            }
+
+            await this.analyzeImmediate(doc);
+        }
     }
 
     private async analyzeImmediate(document: vscode.TextDocument): Promise<void> {
@@ -796,13 +821,18 @@ export class MacroDiagnostics {
         
         // Now we should be at the end of the type name
         // Read backwards to get the word
-        let end = i + 1;
+        const end = i + 1;
         while (i >= 0 && /[a-zA-Z0-9_]/.test(text[i])) {
             i--;
         }
         
-        const word = text.substring(i + 1, end);
+        if (i === end - 1) { return false; } // No word found
         
+        const word = text.substring(i + 1, end);
+        return this.isType(word);
+    }
+
+    private isType(word: string): boolean {
         // Common C/C++ types
         const types = new Set([
             'int', 'char', 'short', 'long', 'float', 'double', 'void',

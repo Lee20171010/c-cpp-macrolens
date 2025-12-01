@@ -216,12 +216,21 @@ export class MacroHoverProvider implements vscode.HoverProvider {
      */
     private async findSimilarSymbols(query: string): Promise<string[]> {
         try {
-            // Execute workspace symbol search
+            // Execute workspace symbol search with timeout
             // This uses the installed C/C++ extension's index
-            const symbols = await vscode.commands.executeCommand<vscode.SymbolInformation[]>(
+            // We add a timeout to prevent hanging if the LSP is busy or unresponsive
+            const timeoutMs = 2000; // 2 second timeout
+            
+            const searchPromise = vscode.commands.executeCommand<vscode.SymbolInformation[]>(
                 'vscode.executeWorkspaceSymbolProvider',
                 query
             );
+            
+            const timeoutPromise = new Promise<vscode.SymbolInformation[]>((resolve) => {
+                setTimeout(() => resolve([]), timeoutMs);
+            });
+
+            const symbols = await Promise.race([searchPromise, timeoutPromise]);
 
             if (!symbols || symbols.length === 0) {
                 return [];

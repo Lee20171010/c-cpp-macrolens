@@ -122,7 +122,8 @@ HoverProvider  Diagnostics  TreeProvider
 3. **Singleton Services**: Core services (database, expander) shared across features
 4. **Configuration-Driven**: Features toggled via workspace settings
 5. **Incremental Updates**: Only reprocess changed files
-6. **Defensive Programming**: Fallback mechanisms (in-memory DB, error handling)
+6. **Event-Driven Updates**: Database emits events to notify consumers (Diagnostics)
+7. **Defensive Programming**: Fallback mechanisms (in-memory DB, error handling)
 
 ### Activation Flow
 
@@ -148,11 +149,11 @@ File Change Event
         ↓
    MacroParser.parse()
         ↓
-  MacroDatabase.saveMacros()
+   MacroDatabase Update
         ↓
-  [HoverProvider, Diagnostics, TreeProvider] notified
+   Event Emitter (onDidChange)
         ↓
-    UI Updates
+   Diagnostics.analyze()
 ```
 
 ## 🧩 Core Components
@@ -182,6 +183,8 @@ interface MacroDef {
 - `saveMacros(file, macros[])`: Batch insert with replace strategy
 - `removeMacrosFromFile(file)`: Delete all macros from file
 - `getAllMacros()`: Full scan (for tree view)
+- `resetDatabase()`: Physically delete and recreate DB file (Clean Rebuild)
+- `onDidChange`: Event fired when database content changes
 
 **Storage Location**:
 - Uses `context.globalStorageUri` from VS Code API
@@ -192,6 +195,7 @@ interface MacroDef {
 - SQLite transactions for batch inserts (~1000 macros/sec)
 - In-memory fallback ~10x faster but loses data on close
 - Prepared statements prevent SQL injection
+- **Clean Rebuild**: "Full Rescan" deletes the .db file to ensure zero fragmentation
 
 ### 2. MacroParser (`src/core/macroParser.ts`)
 

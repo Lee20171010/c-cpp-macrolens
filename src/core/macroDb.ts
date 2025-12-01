@@ -367,6 +367,10 @@ export class MacroDatabase {
     private debounceDelay: number = DATABASE_CONSTANTS.DEFAULT_DEBOUNCE_DELAY;
     private maxDelay: number = DATABASE_CONSTANTS.DEFAULT_MAX_DELAY;
     private workspaceRoot: string | null = null;
+    
+    // Event emitter for database updates
+    private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
+    public readonly onDidChange = this._onDidChange.event;
 
     private constructor() {
         // Don't initialize database immediately
@@ -509,6 +513,33 @@ export class MacroDatabase {
         return Math.abs(hash).toString(16);
     }
 
+    /**
+     * Completely reset the database: close connection, delete file, and re-initialize.
+     * This ensures a clean state and recovers disk space.
+     */
+    private resetDatabase(): void {
+        if (this.db) {
+            try {
+                this.db.close();
+            } catch (e) {
+                console.warn('MacroLens: Error closing database during reset:', e);
+            }
+            this.db = null;
+        }
+
+        if (!this.useInMemory && this.dbPath && fs.existsSync(this.dbPath)) {
+            try {
+                fs.unlinkSync(this.dbPath);
+                console.log(`MacroLens: Deleted database file: ${this.dbPath}`);
+            } catch (e) {
+                console.warn(`MacroLens: Failed to delete database file: ${e}`);
+            }
+        }
+
+        // Re-initialize the connection
+        this.initializeDatabase();
+    }
+
     private initDatabase() {
         if (!this.db) {
             throw new Error('Database not initialized');
@@ -517,6 +548,7 @@ export class MacroDatabase {
         // Schema migration: Check if we need to upgrade from v1 (no files table)
         // If using real SQLite and 'files' table is missing, drop old 'macros' table
         if (!this.useInMemory) {
+            let needRebuild = false;
             try {
                 // Check if 'files' table exists
                 const filesTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='files'").get();
@@ -538,16 +570,18 @@ export class MacroDatabase {
 
                 // If files table missing OR macros table exists but is invalid (old schema)
                 if (!filesTable || (macrosTable && !macrosTableValid)) {
-                    console.log('MacroLens: Migrating database schema - Dropping old tables');
-                    this.db.exec('DROP TABLE IF EXISTS macros');
-                    // If files table exists but macros was old, we might want to keep files, 
-                    // but to be safe and ensure consistency, let's rebuild everything if schema mismatches.
-                    // Actually, if files table exists, we can keep it. But if macros table is old, we MUST drop macros.
+                    console.log('MacroLens: Schema mismatch detected.');
+                    needRebuild = true;
                 }
             } catch (error) {
-                console.warn('MacroLens: Error checking schema, resetting database:', error);
-                this.db.exec('DROP TABLE IF EXISTS macros');
-                this.db.exec('DROP TABLE IF EXISTS files');
+                console.warn('MacroLens: Error checking schema:', error);
+                needRebuild = true;
+            }
+
+            if (needRebuild) {
+                console.log('MacroLens: Performing full database rebuild...');
+                this.resetDatabase();
+                // After reset, this.db is a fresh connection to a new (missing) file
             }
         }
         
@@ -577,9 +611,15 @@ export class MacroDatabase {
         this.db.exec('CREATE INDEX IF NOT EXISTS idx_macro_file_id ON macros(file_id)');
     }
 
-    async scanProject(): Promise<void> {
+    async scanProject(forceRebuild: boolean = false): Promise<void> {
         if (!this.db || !this.initialized) {
             throw new Error('Database not initialized. Call initialize() first.');
+        }
+
+        if (forceRebuild) {
+            console.log('MacroLens: Force rebuild requested. Resetting database...');
+            this.resetDatabase();
+            this.initDatabase(); // Ensure tables are created
         }
 
         const files = await vscode.workspace.findFiles(
@@ -709,6 +749,18 @@ export class MacroDatabase {
             progress.report({ message: 'Finalizing...' });
             this.db!.exec('COMMIT');
             await this.loadDefinitions();
+            
+            // Notify listeners that a full scan completed (pass undefined or a special URI?)
+            // Since we don't track individual files easily here, we can just fire for the workspace root
+            // or let the listener handle a "general update".
+            // For now, let's not fire individual events for a full scan to avoid flooding.
+            // But we should probably fire *something*.
+            // Let's fire a dummy event or just rely on the fact that full scan is rare.
+            // Actually, let's fire for each file if it's not too many, or just one "workspace" event.
+            // Given the API is onDidChange(Uri), let's fire one for the workspace root if possible.
+            if (this.workspaceRoot) {
+                this._onDidChange.fire(vscode.Uri.file(this.workspaceRoot));
+            }
         } catch (error) {
             this.db!.exec('ROLLBACK');
             throw error;
@@ -789,6 +841,11 @@ export class MacroDatabase {
             
             this.db.exec('COMMIT');
             // No need to call loadDefinitions() - we updated cache incrementally
+            
+            // Notify listeners about updates
+            for (const fileUri of fileUris) {
+                this._onDidChange.fire(fileUri);
+            }
         } catch (error) {
             this.db.exec('ROLLBACK');
             throw error;
@@ -822,6 +879,9 @@ export class MacroDatabase {
             
             // Remove from in-memory cache
             this.removeFromCache(relativePath);
+            
+            // Notify listeners
+            this._onDidChange.fire(fileUri);
         } catch (error) {
             console.warn(`Failed to remove file ${fileUri.fsPath}:`, error);
         }
