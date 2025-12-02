@@ -5,6 +5,13 @@ All notable changes to the "C/C++ MacroLens" extension will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2025-12-02
+
+### ⚡ Performance
+
+- **O(N) Diagnostics Algorithm**: Optimized the undefined macro detection algorithm from O(N²) to O(N). Previously, checking for undefined macros involved repeated regex scanning for every token. The new implementation pre-calculates argument ranges in a single pass, eliminating the "Unresponsive extension host" issue on large files.
+- **Smart Diagnostics Scheduling**: Implemented `maxUpdateDelay` support for diagnostics. While `debounceDelay` (500ms) prevents excessive checks during typing, `maxUpdateDelay` (8000ms) now ensures diagnostics eventually run even during continuous typing, preventing "starvation" of error reports.
+
 ## [0.1.7] - 2025-12-02
 
 ### ✨ Features

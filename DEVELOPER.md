@@ -572,6 +572,15 @@ treeProvider.refresh();  // Single UI refresh for all changes
 - Improves perceived performance
 - Prevents VS Code UI thread blocking
 
+### Diagnostics Optimization
+
+**Problem**: Checking for undefined macros in a large file with many macro calls caused "Unresponsive extension host" due to O(N²) complexity (repeated regex scanning for every token).
+
+**Solution**: O(N) Algorithm
+1. **Pre-calculation**: Scan the file once to identify all macro argument ranges.
+2. **Single Pass**: Iterate through tokens and check against pre-calculated ranges.
+3. **Max Wait**: Implemented `maxUpdateDelay` to ensure diagnostics run eventually even during continuous typing.
+
 ## 🔌 Extension API Usage
 
 ### Activation Events

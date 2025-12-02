@@ -44,6 +44,7 @@ Hover over any macro to see:
 
 ### ⚡ Performance Optimized
 - **Event-Driven Architecture** - decoupled updates for maximum responsiveness
+- **O(N) Diagnostics** - Optimized algorithm prevents UI freezes even in large files
 - **LSP Safety** - 2s timeout on symbol searches prevents UI freezes
 - **Incremental scanning** - only processes changed files
 - **Intelligent debouncing** - responsive updates without excessive CPU usage
