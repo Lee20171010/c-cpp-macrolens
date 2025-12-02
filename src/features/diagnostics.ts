@@ -12,7 +12,7 @@ export class MacroDiagnostics {
     private expander: MacroExpander;
     // Debounce timer to avoid frequent diagnostics
     private debounceTimer: NodeJS.Timeout | null = null;
-    private readonly DEBOUNCE_DELAY = 500; // 500ms debounce
+    private maxWaitTimer: NodeJS.Timeout | null = null;
     private pendingDocs: Set<vscode.TextDocument> = new Set();
 
     constructor() {
@@ -25,20 +25,41 @@ export class MacroDiagnostics {
         // Add to pending set
         this.pendingDocs.add(document);
 
+        const config = Configuration.getInstance().getConfig();
+        const debounceDelay = config.debounceDelay || 500;
+        const maxUpdateDelay = config.maxUpdateDelay || 8000;
+
         // Debounce diagnostics to avoid frequent updates
         if (this.debounceTimer) {
             clearTimeout(this.debounceTimer);
         }
         
+        // If no max wait timer is running, start one
+        if (!this.maxWaitTimer) {
+            this.maxWaitTimer = setTimeout(async () => {
+                if (this.debounceTimer) {
+                    clearTimeout(this.debounceTimer);
+                    this.debounceTimer = null;
+                }
+                this.maxWaitTimer = null;
+                await this.processPendingDocs();
+            }, maxUpdateDelay);
+        }
+
         this.debounceTimer = setTimeout(async () => {
+            if (this.maxWaitTimer) {
+                clearTimeout(this.maxWaitTimer);
+                this.maxWaitTimer = null;
+            }
+            this.debounceTimer = null;
             await this.processPendingDocs();
-        }, this.DEBOUNCE_DELAY);
+        }, debounceDelay);
     }
 
     private async processPendingDocs(): Promise<void> {
         const docs = Array.from(this.pendingDocs);
         this.pendingDocs.clear();
-        this.debounceTimer = null;
+        // Timers are cleared by the caller (analyze) before calling this
 
         const config = Configuration.getInstance().getConfig();
         const activeDoc = vscode.window.activeTextEditor?.document;
@@ -101,6 +122,7 @@ export class MacroDiagnostics {
         diagnostics: vscode.Diagnostic[]
     ): void {
         const checkedMacros = new Set<string>();
+        const macroArgRanges: {start: number, end: number}[] = [];
         
         // Part 1: Check function-like macro calls (only uppercase identifiers)
         let match;
@@ -154,7 +176,14 @@ export class MacroDiagnostics {
                 continue;
             }
 
-            const { args } = argsResult;
+            const { args, endIndex } = argsResult;
+            
+            // Store the argument range to skip object-like macro checks inside it
+            // Range is from after '(' to before ')'
+            macroArgRanges.push({
+                start: parenStartIndex + 1,
+                end: endIndex - 1
+            });
 
             // Expand the macro and check for undefined macros in the result
             const expansionResult = this.expander.expand(macroName, args);
@@ -240,7 +269,15 @@ export class MacroDiagnostics {
 
             // CRITICAL: Skip if inside function-like macro arguments
             // Example: FOO(BAR) - BAR will be checked via FOO's expansion
-            if (this.isInsideFunctionLikeMacroArguments(cleanText, callStartIndex)) {
+            // Optimized: Use pre-calculated ranges instead of re-scanning
+            let isInsideArg = false;
+            for (const range of macroArgRanges) {
+                if (callStartIndex >= range.start && callStartIndex <= range.end) {
+                    isInsideArg = true;
+                    break;
+                }
+            }
+            if (isInsideArg) {
                 continue;
             }
 
@@ -481,37 +518,6 @@ export class MacroDiagnostics {
      */
     private escapeRegex(str: string): string {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    /**
-     * Check if a position is inside function-like macro call arguments
-     * This prevents false positives when object-like macros appear as arguments
-     * Example: FOO(BAR) - BAR position will return true
-     */
-    private isInsideFunctionLikeMacroArguments(text: string, position: number): boolean {
-        // Find all function-like macro calls
-        REGEX_PATTERNS.FUNCTION_LIKE_MACRO_CALL.lastIndex = 0;
-        let match;
-        
-        while ((match = REGEX_PATTERNS.FUNCTION_LIKE_MACRO_CALL.exec(text))) {
-            const parenStartIndex = match.index + match[0].length - 1;
-            
-            // Extract arguments to find the range
-            const argsResult = MacroUtils.extractArguments(text, parenStartIndex);
-            if (!argsResult) {
-                continue;
-            }
-            
-            // Check if position is within this macro's argument range
-            const argStart = parenStartIndex + 1; // After opening paren
-            const argEnd = argsResult.endIndex - 1; // Before closing paren
-            
-            if (position >= argStart && position <= argEnd) {
-                return true;
-            }
-        }
-        
-        return false;
     }
 
     /**
